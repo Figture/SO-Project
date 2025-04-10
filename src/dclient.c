@@ -1,6 +1,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include "defs.h"
+
+#define C_TO_S "fifos/c_to_s" // Client TO Server
 
 int main(int argc, char *argv[]){
 
@@ -16,6 +19,8 @@ int main(int argc, char *argv[]){
 	}
 
 	// ligar o fifo
+	
+
 
 	// e se temos varios clientes? abrir um fifo por cliente (PID)? porque tem mts argumentos
 	if(strcmp(argv[1],"-a")==0){
