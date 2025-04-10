@@ -2,6 +2,10 @@
     "files.associations": {
         "unistd.h": "c",
         "services.h": "c",
-        "gtree.h": "c"
+        "gtree.h": "c",
+        "defs.h": "c",
+        "types.h": "c",
+        "fcntl.h": "c",
+        "stdlib.h": "c"
     }
 }

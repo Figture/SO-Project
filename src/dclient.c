@@ -2,8 +2,11 @@
 #include <string.h>
 #include <stdlib.h>
 #include "defs.h"
+#include <sys/stat.h>
+#include <unistd.h>
+#include <fcntl.h>
 
-#define C_TO_S "fifos/c_to_s" // Client TO Server
+
 
 int main(int argc, char *argv[]){
 
@@ -18,11 +21,27 @@ int main(int argc, char *argv[]){
         return 1;
 	}
 
+	// Make the MSG
+	MSG input;
+	if(argc > 1) {
+		strcpy(input.flag,argv[1]);
+		for (int i = 2; i < argc; i++) {
+			strcpy(input.argv[i-2], argv[i]);
+		}
+	}
+	input.pid = getpid();
+	
 	// ligar o fifo
+	int fdin = open(C_TO_S, O_WRONLY);
+	
+	write(fdin, &input, sizeof(MSG));
+
+
+	// fifo output por cliente
 	
 
 
-	// e se temos varios clientes? abrir um fifo por cliente (PID)? porque tem mts argumentos
+	/*
 	if(strcmp(argv[1],"-a")==0){
 		// TO DO
 	}else if(strcmp(argv[1],"-c")==0){
@@ -33,7 +52,9 @@ int main(int argc, char *argv[]){
 		// TO DO
 	}else if(strcmp(argv[1],"-s")==0){
 		// TO DO
-	}/*else if(strcmp(argv[1],"-f")==0){
+	}else if(strcmp(argv[1],"-f")==0){
 		// TO DO
 	}*/
+
+	close(fdin);
 }
