@@ -14,7 +14,10 @@ int main(int argc, char *argv[]){
 		// printf("Stop server: ./dclient -f\n");
         return 1;
 	}
-	
+
+	// ligar o fifo
+
+	// e se temos varios clientes? abrir um fifo por cliente (PID)? porque tem mts argumentos
 	if(strcmp(argv[1],"-a")==0){
 		// TO DO
 	}else if(strcmp(argv[1],"-c")==0){

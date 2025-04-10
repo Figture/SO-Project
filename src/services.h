@@ -7,6 +7,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+// meter isto no novo ficheiro?
 
 typedef struct index{
 	char title[200];
@@ -15,7 +16,7 @@ typedef struct index{
 	int year;
 } Index;
 
-int indexDocument();
+int indexDocument(GTree *tree, Index *in);
 
 int checkKey();
 
