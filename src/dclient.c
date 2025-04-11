@@ -23,7 +23,7 @@ int main(int argc, char *argv[]){
 
 	// Make the MSG
 	MSG input;
-	if(argc > 1) {
+	if(argc > 1) { //perguntar sobre isto ||joão Oliveira
 		strcpy(input.flag,argv[1]);
 		for (int i = 2; i < argc; i++) {
 			strcpy(input.argv[i-2], argv[i]);
