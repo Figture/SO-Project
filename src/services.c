@@ -14,7 +14,7 @@ gint print_index(gpointer key, gpointer value, gpointer data)
 gint print_indexV2(gpointer value)
 { // Fiz esta versão porque nao percebi a do Pedro Mo ||João Oliveira
 	Index *idx = (Index *)value;
-	printf("Title: %s\nAuthor: %s\nYear: %d\nPath: %s", idx->title, idx->authors, idx->year, idx->path);
+	printf("Title: %s\nAuthor: %s\nYear: %d\nPath: %s\n", idx->title, idx->authors, idx->year, idx->path);
 	return 0;
 }
 
@@ -30,7 +30,7 @@ int checkKey(GTree *tree, char index[])
 {
 	// Doing
 	gpointer exist;
-	exist = g_tree_lookup_node(tree, g_strdup(index));
+	exist = g_tree_lookup(tree, g_strdup(index));
 
 	if (exist == NULL)
 	{
@@ -62,12 +62,70 @@ int deleteKey(GTree *tree, char index[])
 
 int searchKeywordByKey(GTree *tree, char index[], char word[])
 {
-	// TO DO
+	gpointer exist;
+	exist = g_tree_lookup(tree, g_strdup(index));
+
+	if(exist == NULL){
+		printf("Meta Information about the requested index was not found\n"); 
+		return -1;
+	}
+
+	Index *idx = (Index *)exist;
+	char *path = idx->path;
+
+	int grep_wc[2];
+	int wc_parent[2];
+
+	if(pipe(grep_wc)<0) perror("pipe failed");
+	pid_t pid1 = fork();
+
+	if(pid1 < 0) perror("Fork failed");
+	if(pid1 == 0){
+		close(grep_wc[0]);
+		dup2(grep_wc[1],1);
+		close(grep_wc[1]);
+		
+		execlp("grep","grep",word,path,NULL);
+		_exit(1);
+	}
+
+	if(pipe(wc_parent)<0) perror("pipe failed");
+	pid_t pid2 = fork();
+
+	if(pid2 < 0) perror("Fork failed");
+	if(pid2 == 0){
+		close(grep_wc[1]);
+		dup2(grep_wc[0],0);
+		close(grep_wc[0]);
+
+		close(wc_parent[0]);
+		dup2(wc_parent[1],1);
+		close(wc_parent[1]);
+		
+		execlp("wc","wc","-l",NULL);
+		_exit(1);
+	}
+
+	close(grep_wc[0]);
+	close(grep_wc[1]);
+
+	close(wc_parent[1]);
+
+	char buffer[64];
+    ssize_t bytes_read = read(wc_parent[0], buffer, sizeof(buffer)-1);
+	
+    if(bytes_read > 0){
+        buffer[bytes_read] = '\0';
+        int count = atoi(buffer);
+        printf("Total: %d\n", count);
+    }else{
+        perror("Read error");
+    }
+
 	return 0;
 }
 
 gint findWord(gpointer key, gpointer value, gpointer data){
-	// int fd, int start, int end, char word[]
 	Index *idx = (Index *)value;
 	DATA_W *info = (DATA_W *)data;
 
@@ -84,8 +142,6 @@ gint findWord(gpointer key, gpointer value, gpointer data){
 		if(pids[i] < 0) perror("Fork failed");
 		if(pids[i] == 0){
 			// CHILD
-			//printf("Child %i (pid= %i)\n", i, getpid());
-
 			int start = i*chunk;
 			int end = (i == NUM_PROC-1 ? size : start+chunk+sizeof(word));
 			int line_size = end-start;
@@ -124,7 +180,6 @@ gint findWord(gpointer key, gpointer value, gpointer data){
 
 int searchKeyword(GTree *tree, char word[])
 {
-	// TO DO
 	DATA_W info; info.word = word;
 	g_tree_foreach(tree, findWord, &info);
 	

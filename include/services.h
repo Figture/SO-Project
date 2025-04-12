@@ -17,7 +17,7 @@ typedef struct data_word{
     char *word;
 } DATA_W;
 
-int NUM_PROC = 10;
+#define NUM_PROC 10
 
 gint compare_str(gconstpointer a, gconstpointer b, gpointer user_data);
 
