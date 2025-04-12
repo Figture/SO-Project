@@ -49,10 +49,22 @@ int main(int argc, char *argv[])
 		else if (strcmp(in.flag, "-l") == 0)
 		{
 			// TO DO
+			printf("-l executing\n");
+			char title_ind[200]; // same as above
+			char word[200]; 
+			strcpy(title_ind, in.argv[0]);
+			strcpy(word, in.argv[1]);
+			searchKeywordByKey(indexTree, title_ind, word);
+			printf("-l finished\n");
 		}
 		else if (strcmp(in.flag, "-s") == 0)
 		{
 			// TO DO
+			printf("-s executing\n");
+			char word[200]; 
+			strcpy(word, in.argv[0]);
+			searchKeyword(indexTree, word);
+			printf("-s finished\n");
 		}
 
 		printf("PRINTING TREE:\n");

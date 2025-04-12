@@ -3,6 +3,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <glib.h>
 
 typedef struct index{
@@ -11,6 +12,12 @@ typedef struct index{
 	char path[64];
 	int year;
 } Index;
+
+typedef struct data_word{
+    char *word;
+} DATA_W;
+
+int NUM_PROC = 10;
 
 gint compare_str(gconstpointer a, gconstpointer b, gpointer user_data);
 

@@ -26,7 +26,7 @@ int indexDocument(GTree *tree, Index *in)
 	return 0;
 }
 
-int checkKey(GTree *tree, char *index[])
+int checkKey(GTree *tree, char index[])
 {
 	// Doing
 	gpointer exist;
@@ -43,7 +43,7 @@ int checkKey(GTree *tree, char *index[])
 	return 0;
 }
 
-int deleteKey(GTree *tree, char *index[])
+int deleteKey(GTree *tree, char index[])
 {
 	// doing
 	gboolean deleted;
@@ -60,14 +60,73 @@ int deleteKey(GTree *tree, char *index[])
 	return 0;
 }
 
-int searchKeywordByKey()
+int searchKeywordByKey(GTree *tree, char index[], char word[])
 {
 	// TO DO
 	return 0;
 }
 
-int searchKeyword()
+gint findWord(gpointer key, gpointer value, gpointer data){
+	// int fd, int start, int end, char word[]
+	Index *idx = (Index *)value;
+	DATA_W *info = (DATA_W *)data;
+
+	char *path = idx->path;
+	char *word = info->word;
+ 
+	int fd = open(path, O_RDONLY);
+	off_t size = lseek(fd,0,SEEK_END);
+	off_t chunk = size / NUM_PROC;
+
+	pid_t pids[NUM_PROC];
+	for(int i=0;i<NUM_PROC;i++){
+		pids[i] = fork();
+		if(pids[i] < 0) perror("Fork failed");
+		if(pids[i] == 0){
+			// CHILD
+			//printf("Child %i (pid= %i)\n", i, getpid());
+
+			int start = i*chunk;
+			int end = (i == NUM_PROC-1 ? size : start+chunk+sizeof(word));
+			int line_size = end-start;
+			char *line = malloc(line_size);
+
+			lseek(fd,start,SEEK_SET);
+
+			ssize_t n, bytes_read = 0;
+
+			while(bytes_read < line_size && (n = read(fd,line+bytes_read,line_size-bytes_read)) > 0){
+				bytes_read += n;
+			}
+
+			if(strstr(line,word)) _exit(1);
+			_exit(-1);
+		}
+	}
+
+	// PARENT
+	int found=0;
+	for(int i=0;i<NUM_PROC;i++){
+		int status; wait(&status);
+		if(WIFEXITED(status)){
+			int rel_val = WEXITSTATUS(status);
+			if(rel_val < 255) found=1;
+		}
+	}
+
+	if(found){
+		printf("Found at: \n");
+		print_index(key,value,data);
+	}
+
+	return 0;
+}
+
+int searchKeyword(GTree *tree, char word[])
 {
 	// TO DO
+	DATA_W info; info.word = word;
+	g_tree_foreach(tree, findWord, &info);
+	
 	return 0;
 }
