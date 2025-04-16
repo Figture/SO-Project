@@ -38,6 +38,16 @@ int main(int argc, char *argv[]){
 
 
 	// fifo output por cliente
+	char outfifo[20];
+	snprintf(outfifo, sizeof(outfifo), "fifos/output%d", input.pid);
+	mkfifo(outfifo, 0666);
+	int fdout = open(outfifo, O_WRONLY);
+
+	// trocar isto com dup para por diretamente no stdout
+	char output[100];
+	read(fdout, &output, sizeof(output));
+	unlink(outfifo);
+	
 	
 
 
