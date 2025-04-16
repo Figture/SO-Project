@@ -20,7 +20,6 @@ gint print_indexV2(gpointer value)
 
 int indexDocument(GTree *tree, Index *in)
 {
-	// TO DO
 	g_tree_insert(tree, g_strdup(in->title), in);
 	printf("Indexed Successfully\n");
 	return 0;
