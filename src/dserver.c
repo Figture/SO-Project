@@ -5,6 +5,9 @@ int main(int argc, char *argv[])
 {
 	printf("SERVER LAUNCHED\n");
 	GTree *indexTree = g_tree_new_full(compare_str, NULL, g_free, g_free);
+	
+	printf("Searching for Meta Information on Saves\n");
+	buildMetaInfo(indexTree);
 
 	// make fifo e o loop com o dummy
 	if (mkfifo(C_TO_S, 0666) == -1) {
@@ -47,28 +50,28 @@ int main(int argc, char *argv[])
 		}
 		else if (strcmp(in.flag, "-c") == 0)
 		{
-			// doing
+			// done
 			printf("-c executing\n");
-			char title_ind[200]; // i give this name because its a title index
-			strcpy(title_ind, in.argv[0]);
-			checkKey(indexTree, title_ind);
+			char title_ind[200]; // i gave this name because its a title index
+			strcpy(title_ind, in.argv[0]); // Copy of the Key index to title_ind
+			checkKey(indexTree, title_ind); //check if meta information about a key is on the tree
 			printf("-c finished\n");
 		}
 		else if (strcmp(in.flag, "-d") == 0)
 		{
-			// doing
+			// done
 			printf("-d executing\n");
 			char title_ind[200]; // same as above
 			strcpy(title_ind, in.argv[0]);
-			deleteKey(indexTree, title_ind);
+			deleteKey(indexTree, title_ind); //delete the meta information of key index from the tree if exists
 			printf("-d finished\n");
 		}
 		else if (strcmp(in.flag, "-l") == 0)
 		{
-			// TO DO
+			// done
 			printf("-l executing\n");
 			char title_ind[200]; // same as above
-			char word[200]; 
+			char word[200];
 			strcpy(title_ind, in.argv[0]);
 			strcpy(word, in.argv[1]);
 			searchKeywordByKey(indexTree, title_ind, word);
@@ -76,17 +79,30 @@ int main(int argc, char *argv[])
 		}
 		else if (strcmp(in.flag, "-s") == 0)
 		{
-			// TO DO
+			// done
 			printf("-s executing\n");
-			char word[200]; 
+			char word[200];
 			strcpy(word, in.argv[0]);
 			searchKeyword(indexTree, word);
 			printf("-s finished\n");
 		}
+		else if (strcmp(in.flag, "-f") == 0)
+		{
+			//doing
+			printf("-f executing\n");
+			
+			saveMetaInfo(indexTree); //save the meta Information on a binary file for next time use
+			g_tree_destroy(indexTree); //free the tree
+			close(dummy_fd); //kills the dummy 
+			 
+		}
 
-		printf("PRINTING TREE:\n");
-		g_tree_foreach(indexTree, print_index, NULL);
-
+		if (indexTree != NULL) {
+			printf("PRINTING TREE:\n");
+			g_tree_foreach(indexTree, print_index, NULL);
+		} else {
+			printf("Tree is NULL (empty or not initialized).\n");
+		}
 		// separador por iteracao
 		printf("\n--------------------\n");
 
@@ -133,7 +149,7 @@ int main(int argc, char *argv[])
 	}
 
 	close(fdin);
-	close(dummy_fd);
+	
 	if (unlink(C_TO_S) == -1) {
 		perror("unlink failed");
 	}
