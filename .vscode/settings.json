@@ -6,6 +6,8 @@
         "defs.h": "c",
         "types.h": "c",
         "fcntl.h": "c",
-        "stdlib.h": "c"
-    }
+        "stdlib.h": "c",
+        "errno.h": "c"
+    },
+    "makefile.configureOnOpen": false
 }

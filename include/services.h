@@ -3,6 +3,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <glib.h>
 
 typedef struct index{
@@ -12,16 +13,26 @@ typedef struct index{
 	int year;
 } Index;
 
+typedef struct data_word{
+    char *word;
+} DATA_W;
+
+#define NUM_PROC 10
+#define SAVE_FILE "../saves"// Save file to save meta information presented on the tree
 gint compare_str(gconstpointer a, gconstpointer b, gpointer user_data);
 
 gint print_index(gpointer key, gpointer value, gpointer data);
 
 int indexDocument(GTree *tree, Index *in);
 
-int checkKey();
+int checkKey(GTree *tree, char index[]);
 
-int deleteKey();
+int deleteKey(GTree *tree, char index[]);
 
 int searchKeywordByKey();
 
 int searchKeyword();
+
+int saveMetaInfo(GTree *tree);
+
+int buildMetaInfo(GTree *tree);
