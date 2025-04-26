@@ -15,9 +15,10 @@ typedef struct index{
 
 typedef struct data_word{
     char *word;
+	int numProc;
+	GList *indexList;
 } DATA_W;
 
-#define NUM_PROC 10
 #define SAVE_FILE "../saves"// Save file to save meta information presented on the tree
 gint compare_str(gconstpointer a, gconstpointer b, gpointer user_data);
 
@@ -29,10 +30,14 @@ int checkKey(GTree *tree, char index[]);
 
 int deleteKey(GTree *tree, char index[]);
 
-int searchKeywordByKey();
+int searchKeywordByKey(GTree *tree, char index[], char word[]);
 
-int searchKeyword();
+int searchKeyword(GTree *tree, char word[], int numProc);
 
 int saveMetaInfo(GTree *tree);
 
 int buildMetaInfo(GTree *tree);
+
+gint findWord(gpointer key, gpointer value, gpointer data);
+
+gint saveMetaInfoNode(gpointer key, gpointer value, gpointer data);

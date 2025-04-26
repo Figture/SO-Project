@@ -82,8 +82,10 @@ int main(int argc, char *argv[])
 			// done
 			printf("-s executing\n");
 			char word[200];
+			char numProc[100];
 			strcpy(word, in.argv[0]);
-			searchKeyword(indexTree, word);
+			strcpy(numProc, in.argv[1]);
+			searchKeyword(indexTree, word, atoi(numProc));
 			printf("-s finished\n");
 		}
 		else if (strcmp(in.flag, "-f") == 0)

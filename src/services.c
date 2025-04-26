@@ -76,7 +76,7 @@ int deleteKey(GTree *tree, char index[])
 int searchKeywordByKey(GTree *tree, char index[], char word[])
 {
 	gpointer exist;
-	exist = g_tree_lookup(tree, g_strdup(index));
+	exist = g_tree_lookup(tree, g_strdup(index)); // search if index exists
 
 	if (exist == NULL)
 	{
@@ -84,29 +84,30 @@ int searchKeywordByKey(GTree *tree, char index[], char word[])
 		return -1;
 	}
 
-	Index *idx = (Index *)exist;
-	char *path = idx->path;
+	Index *idx = (Index *)exist; // get index content
+	char *path = idx->path; // get path to document
 
-	int grep_wc[2];
-	int wc_parent[2];
+	int grep_wc[2]; // file descriptors used for pipe between child that executes grep and child that executes wc
+	int wc_parent[2]; // file descriptors used for pipe between child that executes wc and parent
 
-	if (pipe(grep_wc) < 0)
+	if (pipe(grep_wc) < 0) // pipe between child that executes grep and child that executes wc
 		perror("pipe failed");
-	pid_t pid1 = fork();
+	pid_t pid1 = fork(); 
 
 	if (pid1 < 0)
 		perror("Fork failed");
 	if (pid1 == 0)
 	{
+		// redirect stdout to writer descriptor of pipe
 		close(grep_wc[0]);
 		dup2(grep_wc[1], 1);
 		close(grep_wc[1]);
 
-		execlp("grep", "grep", word, path, NULL);
+		execlp("grep", "grep", word, path, NULL); // output of grep will be written on pipe
 		_exit(1);
 	}
 
-	if (pipe(wc_parent) < 0)
+	if (pipe(wc_parent) < 0) // pipe between child that executes wc and parent
 		perror("pipe failed");
 	pid_t pid2 = fork();
 
@@ -114,15 +115,17 @@ int searchKeywordByKey(GTree *tree, char index[], char word[])
 		perror("Fork failed");
 	if (pid2 == 0)
 	{
+		// redirect stdin to reader descriptor of pipe
 		close(grep_wc[1]);
 		dup2(grep_wc[0], 0);
 		close(grep_wc[0]);
 
+		// redirect output of wc to writer descriptor of pipe
 		close(wc_parent[0]);
 		dup2(wc_parent[1], 1);
 		close(wc_parent[1]);
 
-		execlp("wc", "wc", "-l", NULL);
+		execlp("wc", "wc", "-l", NULL); // output of wc will be written on pipe
 		_exit(1);
 	}
 
@@ -132,7 +135,7 @@ int searchKeywordByKey(GTree *tree, char index[], char word[])
 	close(wc_parent[1]);
 
 	char buffer[64];
-	ssize_t bytes_read = read(wc_parent[0], buffer, sizeof(buffer) - 1);
+	ssize_t bytes_read = read(wc_parent[0], buffer, sizeof(buffer) - 1); // get content from child process
 
 	if (bytes_read > 0)
 	{
@@ -150,18 +153,19 @@ int searchKeywordByKey(GTree *tree, char index[], char word[])
 
 gint findWord(gpointer key, gpointer value, gpointer data)
 {
-	Index *idx = (Index *)value;
-	DATA_W *info = (DATA_W *)data;
+	Index *idx = (Index *)value; // get index content
+	DATA_W *info = (DATA_W *)data; // get data content
 
-	char *path = idx->path;
-	char *word = info->word;
+	char *path = idx->path; // get path to the document
+	char *word = info->word; // get word to be searched
+	int numProc = info->numProc; // get number of processes
 
-	int fd = open(path, O_RDONLY);
-	off_t size = lseek(fd, 0, SEEK_END);
-	off_t chunk = size / NUM_PROC;
+	int fd = open(path, O_RDONLY); // file descriptor of document
+	off_t size = lseek(fd, 0, SEEK_END); // size of document
+	off_t chunk = size / numProc; // size of each part of the document that will be divided
 
-	pid_t pids[NUM_PROC];
-	for (int i = 0; i < NUM_PROC; i++)
+	pid_t pids[numProc];
+	for (int i = 0; i < numProc; i++)
 	{
 		pids[i] = fork();
 		if (pids[i] < 0)
@@ -169,21 +173,21 @@ gint findWord(gpointer key, gpointer value, gpointer data)
 		if (pids[i] == 0)
 		{
 			// CHILD
-			int start = i * chunk;
-			int end = (i == NUM_PROC - 1 ? size : start + chunk + sizeof(word));
-			int line_size = end - start;
-			char *line = malloc(line_size);
+			int start = i * chunk; // start point of reading
+			int end = (i == numProc - 1 ? size : start + chunk + sizeof(word)); // ending point of reading
+			int line_size = end - start; // size to be read
+			char *line = malloc(line_size); // buffer to save the read content
 
 			lseek(fd, start, SEEK_SET);
 
 			ssize_t n, bytes_read = 0;
 
-			while (bytes_read < line_size && (n = read(fd, line + bytes_read, line_size - bytes_read)) > 0)
+			while (bytes_read < line_size && (n = read(fd, line + bytes_read, line_size - bytes_read)) > 0) // reads a chunk of the document
 			{
 				bytes_read += n;
 			}
 
-			if (strstr(line, word))
+			if (strstr(line, word)) // checks if the word was found
 				_exit(1);
 			_exit(-1);
 		}
@@ -191,7 +195,7 @@ gint findWord(gpointer key, gpointer value, gpointer data)
 
 	// PARENT
 	int found = 0;
-	for (int i = 0; i < NUM_PROC; i++)
+	for (int i = 0; i < numProc; i++) // for each child process, check if word was found
 	{
 		int status;
 		wait(&status);
@@ -203,21 +207,30 @@ gint findWord(gpointer key, gpointer value, gpointer data)
 		}
 	}
 
-	if (found)
+	if (found) // if it was found, add it to the list
 	{
-		printf("Found at: \n");
-		print_index(key, value, data);
+		info->indexList = g_list_append(info->indexList, value);
 	}
 
 	return 0;
 }
 
-int searchKeyword(GTree *tree, char word[])
+int searchKeyword(GTree *tree, char word[], int numProc)
 {
-	DATA_W info;
-	info.word = word;
-	g_tree_foreach(tree, findWord, &info);
+	DATA_W info; // struct to save the word to be searched, number of processes and list of indexs
+	info.word = word; 
+	info.numProc = numProc;
+	info.indexList = NULL;
 
+	g_tree_foreach(tree, findWord, &info); // search all indexs that contain word
+
+	printf("[");
+	for (GList *l = info.indexList; l != NULL; l = l->next){
+		Index *idx = (Index *)l->data;
+		if(l->next == NULL) printf("%s", (char *)idx->title);
+		else printf("%s, ", (char *)idx->title);
+    }
+	printf("]\n");
 	return 0;
 }
 
