@@ -33,7 +33,8 @@ int main(int argc, char *argv[])
 	ssize_t bytesRead;
 	while ((bytesRead = read(fdin, &in, sizeof(MSG))))
 	{
-		// falta por isto com forks e coletar
+		// falta por isto com forks e coletar e como modificar a arvore dentro do fork, n modifica o do pai 
+		// por isso n faz diferenca precisamos msm de ter fork ent?
 
 		print_debug("\n----New ITERATION----\n");
 

@@ -74,6 +74,7 @@ int checkKey(GTree *tree, char index[])
 	if (exist == NULL)
 	{
 		print_debug("Meta Information about the requested index was not found\n");
+		printf("Meta Information about the requested index was not found\n");
 	}
 	else
 	{
@@ -92,11 +93,13 @@ int deleteKey(GTree *tree, char index[])
 	deleted = g_tree_remove(tree, g_strdup(index)); // search on the tree to see if the key index exists and removes the Node if exists return (True if removed|False if don't exists)
 	if (deleted != TRUE)
 	{
-		printf("The Index was not found, so It cannot be deleted\n"); // if the function doesn't found the key index it doesn't remove anything
+		print_debug("The Index was not found, so It cannot be deleted\n"); // if the function doesn't found the key index it doesn't remove anything
+		printf("The Index was not found, so It cannot be deleted\n");
 	}
 	else
 	{
-		printf("Index entry %s deleted\n", index); // if the function found the key index deletes the node from the Tree
+		print_debug("Index entry deleted\n"); // if the function found the key index deletes the node from the Tree
+		printf("Index entry %s deleted\n", index);
 	}
 
 	return 0;
