@@ -45,6 +45,16 @@ int main(int argc, char *argv[])
 	}
 	input.pid = getpid();
 
+	// making fifo client to server in case the server still not initiated
+	if (mkfifo(C_TO_S, 0666) == -1)
+	{
+		if (errno != EEXIST)
+		{ // if the FIFO already exists no problem
+			perror("mkfifo c_to_s failed");
+			return 1;
+		}
+	}
+
 	// Opening fifo Client to Server
 	int fdin = open(C_TO_S, O_WRONLY);
 	if (fdin == -1)
@@ -60,7 +70,7 @@ int main(int argc, char *argv[])
 	if (mkfifo(outfifo, 0666) == -1)
 	{
 		if (errno != EEXIST)
-		{ // it's okay if the FIFO already exists
+		{ // if the FIFO already exists no problem
 			perror("mkfifo outfifo(pid) failed");
 			return 1;
 		}

@@ -20,9 +20,14 @@ typedef struct data_word{
 } DATA_W;
 
 #define SAVE_FILE "../saves"// Save file to save meta information presented on the tree
+
+void print_debug(const char *msg);
+
 gint compare_str(gconstpointer a, gconstpointer b, gpointer user_data);
 
 gint print_index(gpointer key, gpointer value, gpointer data);
+
+gint print_index_debug(gpointer key, gpointer value, gpointer data);
 
 int indexDocument(GTree *tree, Index *in);
 

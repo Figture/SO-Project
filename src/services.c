@@ -1,5 +1,12 @@
 #include "services.h"
 
+void print_debug(const char *msg) {
+	//this function is to print on stderr and make it red color
+    write(2, "\033[31m", 5);
+    write(2, msg, strlen(msg));
+    write(2, "\033[0m", 4);
+}
+
 gint compare_str(gconstpointer a, gconstpointer b, gpointer user_data)
 {
 	return g_strcmp0((const char *)a, (const char *)b);
@@ -20,6 +27,25 @@ gint print_index(gpointer key, gpointer value, gpointer data)
 	return 0;
 }
 
+gint print_index_debug(gpointer key, gpointer value, gpointer data)
+{
+	if (value == NULL)
+	{
+		print_debug("Value is NULL for key:\n");
+		return 0;
+	}
+
+	Index *idx = (Index *)value;
+
+	// talvez ajustar o tamanho do buffer, mas a soma de todos os elementos n da 1024
+	char buffer[1024];
+	snprintf(buffer, 1024, "Title: %s\nAuthor: %s\nYear: %d\nPath: %s\n", idx->title, idx->authors, idx->year, idx->path);
+
+	print_debug(buffer);
+	print_debug("---Node-Seperator---\n");
+
+	return 0;
+}
 gint print_indexV2(gpointer value)
 { // Fiz esta versão porque nao percebi a do Pedro Mo ||João Oliveira
 	if (value == NULL)
@@ -35,7 +61,7 @@ gint print_indexV2(gpointer value)
 int indexDocument(GTree *tree, Index *in)
 {
 	g_tree_insert(tree, g_strdup(in->title), in);
-	printf("Indexed Successfully\n");
+	print_debug("Indexed Successfully\n");
 	return 0;
 }
 
@@ -47,10 +73,13 @@ int checkKey(GTree *tree, char index[])
 
 	if (exist == NULL)
 	{
-		printf("Meta Information about the requested index was not found\n");
+		print_debug("Meta Information about the requested index was not found\n");
 	}
 	else
 	{
+		
+		print_debug("Meta Information about the requested was found\n");
+		printf("Meta Information requested:\n");
 		print_indexV2(exist);
 	}
 	return 0;
@@ -63,7 +92,7 @@ int deleteKey(GTree *tree, char index[])
 	deleted = g_tree_remove(tree, g_strdup(index)); // search on the tree to see if the key index exists and removes the Node if exists return (True if removed|False if don't exists)
 	if (deleted != TRUE)
 	{
-		printf("The Index was not found, so It cannot be deleted"); // if the function doesn't found the key index it doesn't remove anything
+		printf("The Index was not found, so It cannot be deleted\n"); // if the function doesn't found the key index it doesn't remove anything
 	}
 	else
 	{
@@ -251,7 +280,7 @@ gint saveMetaInfoNode(gpointer key, gpointer value, gpointer data)
 		close(fd);
 		return -1;
 	}
-	printf("Node has been saved on the file\n");
+	print_debug("Node has been saved on the file\n");
 	close(fd);
 	return 0;
 }
@@ -273,7 +302,7 @@ int buildMetaInfo(GTree *tree)
 	off_t size = lseek(fd, 0, SEEK_END); // to see if the save file has information
 	if (size == 0)
 	{
-		printf("Save file without information\n");
+		print_debug("Save file without information\n");
 		return 0;
 	}
 	lseek(fd, 0, SEEK_SET); // return to begin of file if the save file has information
@@ -287,7 +316,7 @@ int buildMetaInfo(GTree *tree)
 		if ((bytes_lidos = read(fd, temp, sizeof(Index))) > 0) // for each index is called the indexDocument to construct the tree
 		{
 
-			printf("indexed one Index\n");
+			print_debug("indexed one Index\n");
 			indexDocument(tree, temp);
 		}
 	}
@@ -297,12 +326,12 @@ int buildMetaInfo(GTree *tree)
 	if (fd_clean != -1)
 	{
 		// file is empty
-		printf("after building the tree the save file is cleaned\n");
+		print_debug("after building the tree the save file is cleaned\n");
 		close(fd_clean);
 	}
 
-	printf("PRINTING TREE:\n"); // print the tree to know how many nodes it has and the metainformation
-	g_tree_foreach(tree, print_index, NULL);
+	print_debug("PRINTING TREE:\n"); // print the tree to know how many nodes it has and the metainformation
+	g_tree_foreach(tree, print_index_debug, NULL);
 
 	return 0;
 }
