@@ -13,7 +13,7 @@ int main(int argc, char *argv[])
 	if (mkfifo(C_TO_S, 0666) == -1)
 	{
 		if (errno != EEXIST)
-		{ // it's okay if the FIFO already exists
+		{ // if the FIFO already exists no problem
 			perror("mkfifo client to server failed");
 			return 1;
 		}

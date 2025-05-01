@@ -2,7 +2,7 @@
 
 void print_debug(const char *msg) {
 	//this function is to print on stderr and make it red color
-    write(2, "\033[31m", 5);
+    write(2, "\033[96m", 5);
     write(2, msg, strlen(msg));
     write(2, "\033[0m", 4);
 }
@@ -61,6 +61,7 @@ gint print_indexV2(gpointer value)
 int indexDocument(GTree *tree, Index *in)
 {
 	g_tree_insert(tree, g_strdup(in->title), in);
+	printf("Indexed \"%s\" Successfully\n", in->title);
 	print_debug("Indexed Successfully\n");
 	return 0;
 }
