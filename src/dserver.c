@@ -119,9 +119,8 @@ int main(int argc, char *argv[])
 			char numProc[100];
 
 			strcpy(word, in.argv[0]);
-			strcpy(numProc, in.argv[1]);
-
-			sprintf(numProc, "%d", 1); // 1 process if number not given
+			if(in.argc == 4) strcpy(numProc, in.argv[1]);
+			else sprintf(numProc, "%d", 1); // 1 process if number not given
 
 			searchKeyword(indexTree, word, atoi(numProc));
 			print_debug("-s finished\n");

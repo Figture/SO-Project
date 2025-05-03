@@ -6,6 +6,7 @@
 typedef struct msg {
     char flag[3];
     char argv[4][200];
+    int argc;
     pid_t pid;
 } MSG;
 

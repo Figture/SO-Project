@@ -43,6 +43,7 @@ int main(int argc, char *argv[])
 		}
 	}
 	input.pid = getpid();
+	input.argc = argc;
 
 	// making fifo client to server in case the server still not initiated
 	if (mkfifo(C_TO_S, 0666) == -1)
