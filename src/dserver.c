@@ -28,6 +28,7 @@ int main(int argc, char *argv[])
 		if (errno != EEXIST)
 		{ // if the FIFO already exists no problem
 			perror("mkfifo client to server failed");
+			unlink(C_TO_S);
 			return 1;
 		}
 	}
@@ -44,27 +45,28 @@ int main(int argc, char *argv[])
 
 	MSG in;
 	ssize_t bytesRead;
-	if (pidesCount >= PNUM)
-	{
-		int status;
-		for (int l = 0; l < PNUM; l++)
-		{
-			waitpid(pides[l], &status, 0);
 
-			if (WIFEXITED(status))
-			{
-				int code = WEXITSTATUS(status);
-				char soncode[255];
-				snprintf(soncode, 255, "Filho %d terminou com código %d\n", pides[l], code);
-				print_debug(soncode);
-			}
-		}
-		pidesCount = 0;
-	}
-	while ((bytesRead = read(fdin, &in, sizeof(MSG))))
+	while ((bytesRead = read(fdin, &in, sizeof(MSG))>0))
 	{
-		// falta por isto com forks e coletar e como modificar a arvore dentro do fork, n modifica o do pai
-		// por isso n faz diferenca precisamos msm de ter fork ent?
+		//secure the number of son's processes
+		if (pidesCount >= PNUM)
+		{
+			int status;
+			for (int l = 0; l < PNUM; l++)
+			{
+				waitpid(pides[l], &status, 0);
+
+				if (WIFEXITED(status))
+				{
+					int code = WEXITSTATUS(status);
+					char soncode[255];
+					snprintf(soncode, 255, "Filho %d terminou com código %d\n", pides[l], code);
+					print_debug(soncode);
+				}
+			}
+			pidesCount = 0;
+		}
+		
 
 		print_debug("\n----New ITERATION----\n");
 
@@ -97,8 +99,10 @@ int main(int argc, char *argv[])
 		if (dup2(fdout, 1) == -1)
 		{
 			perror("dup2 failed");
+			close(fdout);
+			continue;
 		}
-		close(fdout);
+
 		if (strcmp(in.flag, "-a") == 0)
 		{
 			if (pidesCount != 0)
@@ -128,7 +132,7 @@ int main(int argc, char *argv[])
 			t->year = atoi(in.argv[2]);
 			char text[16];
 			strcpy(text, in.argv[3]);
-			sprintf(t->path, "%s/%s", documentFolder, text);
+			snprintf(t->path, 64, "%s/%s", documentFolder, text);
 			indexDocument(indexTree, t);
 			print_debug("-a finished\n");
 		}
@@ -250,7 +254,10 @@ int main(int argc, char *argv[])
 		{
 			perror("close failed");
 		}
-		
+		if (close(fdout) == -1)
+		{
+			perror("close failed");
+		}
 	}
 
 	if (bytesRead == -1)
