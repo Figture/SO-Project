@@ -117,8 +117,12 @@ int main(int argc, char *argv[])
 			print_debug("-s executing\n");
 			char word[200];
 			char numProc[100];
+
 			strcpy(word, in.argv[0]);
 			strcpy(numProc, in.argv[1]);
+
+			sprintf(numProc, "%d", 1); // 1 process if number not given
+
 			searchKeyword(indexTree, word, atoi(numProc));
 			print_debug("-s finished\n");
 		}
