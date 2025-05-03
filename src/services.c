@@ -80,7 +80,7 @@ int checkKey(GTree *tree, char index[])
 	else
 	{
 		
-		print_debug("Meta Information about the requested was found\n");
+		print_debug("Meta Information about the requested index was found\n");
 		printf("Meta Information requested:\n");
 		print_indexV2(exist);
 	}
@@ -270,6 +270,8 @@ int searchKeyword(GTree *tree, char word[], int numProc)
 gint saveMetaInfoNode(gpointer key, gpointer value, gpointer data)
 {
 	Index *node = (Index *)value;
+	
+		
 
 	int fd = open(SAVE_FILE, O_CREAT | O_WRONLY | O_APPEND, 0640); // open file where the Index struct is gonna be saved
 	if (fd == -1)
@@ -291,6 +293,7 @@ gint saveMetaInfoNode(gpointer key, gpointer value, gpointer data)
 
 int saveMetaInfo(GTree *tree)
 {
+	printf("Server is shuting down \n");
 	g_tree_foreach(tree, saveMetaInfoNode, NULL); // for each node its called saveMetaInfoNode to save the Index on the binary file
 	return 0;
 }

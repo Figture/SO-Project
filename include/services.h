@@ -20,7 +20,7 @@ typedef struct data_word{
 } DATA_W;
 
 #define SAVE_FILE "../saves"// Save file to save meta information presented on the tree
-
+#define PNUM 2
 void print_debug(const char *msg);
 
 gint compare_str(gconstpointer a, gconstpointer b, gpointer user_data);
