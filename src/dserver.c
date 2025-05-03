@@ -71,14 +71,14 @@ int main(int argc, char *argv[])
 		char outfifo[20];
 
 		snprintf(outfifo, sizeof(outfifo), "../fifos/output%d", in.pid);
-		if (mkfifo(outfifo, 0666) == -1)
-		{
-			if (errno != EEXIST)
-			{ // if the FIFO already exists no problem
-				perror("mkfifo outfifo(pid) failed");
-				return 1;
-			}
-		}
+		// if (mkfifo(outfifo, 0666) == -1)
+		// {
+		// 	if (errno != EEXIST)
+		// 	{ // if the FIFO already exists no problem
+		// 		perror("mkfifo outfifo(pid) failed");
+		// 		return 1;
+		// 	}
+		// }
 		int fdout = open(outfifo, O_WRONLY);
 		if (fdout == -1)
 		{
