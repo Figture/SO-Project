@@ -20,7 +20,7 @@ typedef struct data_word{
 } DATA_W;
 
 #define SAVE_FILE "../saves"// Save file to save meta information presented on the tree
-#define PNUM 2
+#define PNUM 20
 void print_debug(const char *msg);
 
 gint compare_str(gconstpointer a, gconstpointer b, gpointer user_data);
@@ -29,17 +29,17 @@ gint print_index(gpointer key, gpointer value, gpointer data);
 
 gint print_index_debug(gpointer key, gpointer value, gpointer data);
 
-int indexDocument(GTree *tree, Index *in);
+int indexDocument(GTree *tree, Index *in,int fdout);
 
-int checkKey(GTree *tree, char index[]);
+int checkKey(GTree *tree, char index[],int fdout);
 
-int deleteKey(GTree *tree, char index[]);
+int deleteKey(GTree *tree, char index[],int fdout);
 
-int searchKeywordByKey(GTree *tree, char index[], char word[]);
+int searchKeywordByKey(GTree *tree, char index[], char word[],int fdout);
 
-int searchKeyword(GTree *tree, char word[], int numProc);
+int searchKeyword(GTree *tree, char word[], int numProc,int fdout);
 
-int saveMetaInfo(GTree *tree);
+int saveMetaInfo(GTree *tree,int fdout);
 
 int buildMetaInfo(GTree *tree);
 

@@ -42,10 +42,10 @@ int main(int argc, char *argv[])
 	{
 		perror("open dummy failed");
 	}
-
+	
 	MSG in;
 	ssize_t bytesRead;
-
+	printf("Vou ler\n");
 	while ((bytesRead = read(fdin, &in, sizeof(MSG))>0))
 	{
 		//secure the number of son's processes
@@ -87,21 +87,8 @@ int main(int argc, char *argv[])
 			perror("open server to client fifo failed");
 		}
 
-		// Storing stdout fd
-		int original_stdout = dup(1);
-		if (original_stdout == -1)
-		{
-			perror("dup failed");
-			close(fdout);
-			return 1;
-		}
-		// Redirect stdout to the FIFO
-		if (dup2(fdout, 1) == -1)
-		{
-			perror("dup2 failed");
-			close(fdout);
-			continue;
-		}
+		
+		
 
 		if (strcmp(in.flag, "-a") == 0)
 		{
@@ -133,7 +120,7 @@ int main(int argc, char *argv[])
 			char text[16];
 			strcpy(text, in.argv[3]);
 			snprintf(t->path, 64, "%s/%s", documentFolder, text);
-			indexDocument(indexTree, t);
+			indexDocument(indexTree, t,fdout);
 			print_debug("-a finished\n");
 		}
 		else if (strcmp(in.flag, "-c") == 0)
@@ -150,7 +137,7 @@ int main(int argc, char *argv[])
 				print_debug("-c executing\n");
 				char title_ind[200];			// i gave this name because its a title index
 				strcpy(title_ind, in.argv[0]);	// Copy of the Key index to title_ind
-				checkKey(indexTree, title_ind); // check if meta information about a key is on the tree
+				checkKey(indexTree, title_ind,fdout); // check if meta information about a key is on the tree
 				print_debug("-c finished\n");
 				_exit(1);
 			}
@@ -162,7 +149,7 @@ int main(int argc, char *argv[])
 			print_debug("-d executing\n");
 			char title_ind[200]; // same as above
 			strcpy(title_ind, in.argv[0]);
-			deleteKey(indexTree, title_ind); // delete the meta information of key index from the tree if exists
+			deleteKey(indexTree, title_ind,fdout); // delete the meta information of key index from the tree if exists
 			print_debug("-d finished\n");
 		}
 		else if (strcmp(in.flag, "-l") == 0)
@@ -178,7 +165,7 @@ int main(int argc, char *argv[])
 				char word[200];
 				strcpy(title_ind, in.argv[0]);
 				strcpy(word, in.argv[1]);
-				searchKeywordByKey(indexTree, title_ind, word);
+				searchKeywordByKey(indexTree, title_ind, word,fdout);
 				print_debug("-l finished\n");
 				_exit(1);
 			}
@@ -197,7 +184,7 @@ int main(int argc, char *argv[])
 				char numProc[100];
 				strcpy(word, in.argv[0]);
 				strcpy(numProc, in.argv[1]);
-				searchKeyword(indexTree, word, atoi(numProc));
+				searchKeyword(indexTree, word, atoi(numProc),fdout);
 				print_debug("-s finished\n");
 				_exit(1);
 			}
@@ -226,7 +213,7 @@ int main(int argc, char *argv[])
 			}
 			print_debug("-f executing\n");
 
-			saveMetaInfo(indexTree);   // save the meta Information on a binary file for next time use
+			saveMetaInfo(indexTree,fdout);   // save the meta Information on a binary file for next time use
 			g_tree_destroy(indexTree); // free the tree
 			close(dummy_fd);		   // kills the dummy
 		}
@@ -241,23 +228,11 @@ int main(int argc, char *argv[])
 			perror("Tree is NULL (empty or not initialized).\n");
 		}
 
-		fflush(stdout); // make sure it flushes immediately
-
-		// Restoring the stdout fd
-		if (dup2(original_stdout, STDOUT_FILENO) == -1)
-		{
-			perror("dup2 back to original stdout failed");
-			close(original_stdout);
-			return 1;
-		}
-		if (close(original_stdout) == -1)
-		{
-			perror("close failed");
-		}
-		if (close(fdout) == -1)
-		{
-			perror("close failed");
-		}
+		
+		close(fdout);
+		
+		
+		
 	}
 
 	if (bytesRead == -1)
