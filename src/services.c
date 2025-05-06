@@ -1,12 +1,16 @@
 #include "services.h"
 
-void print_debug(const char *msg) {
-	//this function is to print on stderr and make it red color
-    write(2, "\033[96m", 5);
-    write(2, msg, strlen(msg));
-    write(2, "\033[0m", 4);
+void print_debug(const char *msg)
+{
+	// this function is to print on stderr and make it red color
+	write(2, "\033[96m", 5);
+	write(2, msg, strlen(msg));
+	write(2, "\033[0m", 4);
 }
-
+void print_client(const char *msg, int fdout)
+{
+	write(fdout, msg, strlen(msg));
+}
 gint compare_str(gconstpointer a, gconstpointer b, gpointer user_data)
 {
 	return g_strcmp0((const char *)a, (const char *)b);
@@ -58,15 +62,20 @@ gint print_indexV2(gpointer value)
 	return 0;
 }
 
-int indexDocument(GTree *tree, Index *in)
+int indexDocument(GTree *tree, Index *in, int fdout)
 {
+	char msg[300];
 	g_tree_insert(tree, g_strdup(in->title), in);
-	printf("Indexed \"%s\" Successfully\n", in->title);
+	if (fdout != 0)
+	{
+		snprintf(msg, sizeof(msg), "Indexed \"%s\" Successfully\n", in->title);
+		print_client(msg, fdout);
+	}
 	print_debug("Indexed Successfully\n");
 	return 0;
 }
 
-int checkKey(GTree *tree, char index[])
+int checkKey(GTree *tree, char index[], int fdout)
 {
 	// Doing
 	gpointer exist;
@@ -74,20 +83,23 @@ int checkKey(GTree *tree, char index[])
 
 	if (exist == NULL)
 	{
+
 		print_debug("Meta Information about the requested index was not found\n");
-		printf("Meta Information about the requested index was not found\n");
+
+		print_client("Meta Information about the requested index was not found\n", fdout);
 	}
 	else
 	{
-		
-		print_debug("Meta Information about the requested was found\n");
-		printf("Meta Information requested:\n");
-		print_indexV2(exist);
+		char msg[600];
+		Index *idx = (Index *)exist;
+		snprintf(msg, sizeof(msg), "Meta Information requested:\nTitle: %s\nAuthor: %s\nYear: %d\nPath: %s\n", idx->title, idx->authors, idx->year, idx->path);
+		print_client(msg, fdout);
+		print_debug("Meta Information about the requested index was found\n ");
 	}
 	return 0;
 }
 
-int deleteKey(GTree *tree, char index[])
+int deleteKey(GTree *tree, char index[], int fdout)
 {
 	// doing
 	gboolean deleted;
@@ -95,37 +107,39 @@ int deleteKey(GTree *tree, char index[])
 	if (deleted != TRUE)
 	{
 		print_debug("The Index was not found, so It cannot be deleted\n"); // if the function doesn't found the key index it doesn't remove anything
-		printf("The Index was not found, so It cannot be deleted\n");
+		print_client("The Index was not found, so It cannot be deleted\n", fdout);
 	}
 	else
 	{
+		char msg[250];
 		print_debug("Index entry deleted\n"); // if the function found the key index deletes the node from the Tree
-		printf("Index entry %s deleted\n", index);
+		snprintf(msg, sizeof(msg), "Index entry %s deleted\n", index);
+		print_client(msg, fdout);
 	}
 
 	return 0;
 }
 
-int searchKeywordByKey(GTree *tree, char index[], char word[])
+int searchKeywordByKey(GTree *tree, char index[], char word[], int fdout)
 {
 	gpointer exist;
 	exist = g_tree_lookup(tree, g_strdup(index)); // search if index exists
 
 	if (exist == NULL)
 	{
-		printf("Meta Information about the requested index was not found\n");
+		print_client("Meta Information about the requested index was not found\n", fdout);
 		return -1;
 	}
 
 	Index *idx = (Index *)exist; // get index content
-	char *path = idx->path; // get path to document
+	char *path = idx->path;		 // get path to document
 
-	int grep_wc[2]; // file descriptors used for pipe between child that executes grep and child that executes wc
+	int grep_wc[2];	  // file descriptors used for pipe between child that executes grep and child that executes wc
 	int wc_parent[2]; // file descriptors used for pipe between child that executes wc and parent
 
 	if (pipe(grep_wc) < 0) // pipe between child that executes grep and child that executes wc
 		perror("pipe failed");
-	pid_t pid1 = fork(); 
+	pid_t pid1 = fork();
 
 	if (pid1 < 0)
 		perror("Fork failed");
@@ -172,9 +186,11 @@ int searchKeywordByKey(GTree *tree, char index[], char word[])
 
 	if (bytes_read > 0)
 	{
+		char msg[150];
 		buffer[bytes_read] = '\0';
 		int count = atoi(buffer);
-		printf("Total: %d\n", count);
+		snprintf(msg, sizeof(msg), "Total %d \n", count);
+		print_client(msg, fdout);
 	}
 	else
 	{
@@ -186,16 +202,16 @@ int searchKeywordByKey(GTree *tree, char index[], char word[])
 
 gint findWord(gpointer key, gpointer value, gpointer data)
 {
-	Index *idx = (Index *)value; // get index content
+	Index *idx = (Index *)value;   // get index content
 	DATA_W *info = (DATA_W *)data; // get data content
 
-	char *path = idx->path; // get path to the document
-	char *word = info->word; // get word to be searched
+	char *path = idx->path;		 // get path to the document
+	char *word = info->word;	 // get word to be searched
 	int numProc = info->numProc; // get number of processes
 
-	int fd = open(path, O_RDONLY); // file descriptor of document
+	int fd = open(path, O_RDONLY);		 // file descriptor of document
 	off_t size = lseek(fd, 0, SEEK_END); // size of document
-	off_t chunk = size / numProc; // size of each part of the document that will be divided
+	off_t chunk = size / numProc;		 // size of each part of the document that will be divided
 
 	pid_t pids[numProc];
 	for (int i = 0; i < numProc; i++)
@@ -206,10 +222,10 @@ gint findWord(gpointer key, gpointer value, gpointer data)
 		if (pids[i] == 0)
 		{
 			// CHILD
-			int start = i * chunk; // start point of reading
+			int start = i * chunk;												// start point of reading
 			int end = (i == numProc - 1 ? size : start + chunk + sizeof(word)); // ending point of reading
-			int line_size = end - start; // size to be read
-			char *line = malloc(line_size); // buffer to save the read content
+			int line_size = end - start;										// size to be read
+			char *line = malloc(line_size);										// buffer to save the read content
 
 			lseek(fd, start, SEEK_SET);
 
@@ -248,22 +264,34 @@ gint findWord(gpointer key, gpointer value, gpointer data)
 	return 0;
 }
 
-int searchKeyword(GTree *tree, char word[], int numProc)
+int searchKeyword(GTree *tree, char word[], int numProc, int fdout)
 {
 	DATA_W info; // struct to save the word to be searched, number of processes and list of indexs
-	info.word = word; 
+	info.word = word;
 	info.numProc = numProc;
 	info.indexList = NULL;
 
 	g_tree_foreach(tree, findWord, &info); // search all indexs that contain word
 
-	printf("[");
-	for (GList *l = info.indexList; l != NULL; l = l->next){
+	print_client("[", fdout);
+	for (GList *l = info.indexList; l != NULL; l = l->next)
+	{
+		char msg[220];
 		Index *idx = (Index *)l->data;
-		if(l->next == NULL) printf("%s", (char *)idx->title);
-		else printf("%s, ", (char *)idx->title);
-    }
-	printf("]\n");
+		if (l->next == NULL)
+		{
+			snprintf(msg, sizeof(msg),"%s", (char *)idx->title);
+			print_client(msg,fdout);
+			
+		}
+		else
+		{
+			snprintf(msg, sizeof(msg),"%s, ", (char *)idx->title);
+			print_client(msg,fdout);
+			
+		}
+	}
+	print_client("]\n", fdout);
 	return 0;
 }
 
@@ -289,15 +317,16 @@ gint saveMetaInfoNode(gpointer key, gpointer value, gpointer data)
 	return 0;
 }
 
-int saveMetaInfo(GTree *tree)
+int saveMetaInfo(GTree *tree,int fdout)
 {
+	print_client("Server is shuting down \n",fdout);
 	g_tree_foreach(tree, saveMetaInfoNode, NULL); // for each node its called saveMetaInfoNode to save the Index on the binary file
 	return 0;
 }
 
 int buildMetaInfo(GTree *tree)
 {
-	int fd = open(SAVE_FILE, O_CREAT | O_RDONLY, 0640); // file descriptor to the save file
+	int fd = open(SAVE_FILE, O_CREAT | O_RDONLY, 0666); // file descriptor to the save file
 	if (fd == -1)
 	{
 		perror("Error opening the file\n");
@@ -321,12 +350,12 @@ int buildMetaInfo(GTree *tree)
 		{
 
 			print_debug("indexed one Index\n");
-			indexDocument(tree, temp);
+			indexDocument(tree, temp, 0);
 		}
 	}
 
 	close(fd);
-	int fd_clean = open(SAVE_FILE, O_WRONLY | O_TRUNC, 0640); // O_TRUNC cleans the file
+	int fd_clean = open(SAVE_FILE, O_WRONLY | O_TRUNC, 0666); // O_TRUNC cleans the file
 	if (fd_clean != -1)
 	{
 		// file is empty

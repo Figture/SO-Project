@@ -24,7 +24,7 @@ int main(int argc, char *argv[])
 	// Make the MSG
 	MSG input;
 	if (argc > 1)
-	{ 
+	{
 		strcpy(input.flag, argv[1]);
 		if (argc == 2 && (strcmp(input.flag, "-f") != 0))
 		{
@@ -45,15 +45,15 @@ int main(int argc, char *argv[])
 	input.pid = getpid();
 	input.argc = argc;
 
-	// making fifo client to server in case the server still not initiated
-	if (mkfifo(C_TO_S, 0666) == -1)
-	{
-		if (errno != EEXIST)
-		{ // if the FIFO already exists no problem
-			perror("mkfifo c_to_s failed");
-			return 1;
-		}
-	}
+	// // making fifo client to server in case the server still not initiated
+	// if (mkfifo(C_TO_S, 0666) == -1)
+	// {
+	// 	if (errno != EEXIST)
+	// 	{ // if the FIFO already exists no problem
+	// 		perror("mkfifo c_to_s failed");
+	// 		return 1;
+	// 	}
+	// }
 
 	// Opening fifo Client to Server
 	int fdin = open(C_TO_S, O_WRONLY);
@@ -61,32 +61,41 @@ int main(int argc, char *argv[])
 	{
 		perror("open client to server failed");
 	}
-
-	write(fdin, &input, sizeof(MSG));
+	
 
 	// different fifo output for each client
 	char outfifo[20];
 	snprintf(outfifo, sizeof(outfifo), "../fifos/output%d", input.pid);
+	
 	if (mkfifo(outfifo, 0666) == -1)
 	{
 		if (errno != EEXIST)
 		{ // if the FIFO already exists no problem
 			perror("mkfifo outfifo(pid) failed");
+			unlink(outfifo);
 			return 1;
 		}
 	}
+	
+	write(fdin, &input, sizeof(MSG));
+	
 	int fdout = open(outfifo, O_RDONLY);
-	if (fdin == -1)
+	if (fdout == -1)
 	{
 		perror("open server to client failed");
 	}
+	
+
 	char output[100];
 	ssize_t bytesRead;
+	
 	while ((bytesRead = read(fdout, output, sizeof(output) - 1)) > 0)
 	{
+		
 		output[bytesRead] = '\0'; // Null to turn output a string
 		printf("%s", output);
 	}
+	close(fdout);
 	if (bytesRead == -1)
 	{
 		perror("read server to client failed");

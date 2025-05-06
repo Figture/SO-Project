@@ -3,6 +3,19 @@
 
 int main(int argc, char *argv[])
 {
+
+	int pides[PNUM];	// save the son's pids
+	int pidesCount = 0; // counter of pids
+	char documentFolder[48];
+	if (argc > 1)
+	{
+
+		strcpy(documentFolder, argv[1]);
+	}
+	else
+	{
+		strcpy(documentFolder, "");
+	}
 	print_debug("SERVER LAUNCHED\n");
 	GTree *indexTree = g_tree_new_full(compare_str, NULL, g_free, g_free);
 
@@ -15,6 +28,7 @@ int main(int argc, char *argv[])
 		if (errno != EEXIST)
 		{ // if the FIFO already exists no problem
 			perror("mkfifo client to server failed");
+			unlink(C_TO_S);
 			return 1;
 		}
 	}
@@ -28,68 +42,106 @@ int main(int argc, char *argv[])
 	{
 		perror("open dummy failed");
 	}
-
+	
 	MSG in;
 	ssize_t bytesRead;
-	while ((bytesRead = read(fdin, &in, sizeof(MSG))))
+	printf("Vou ler\n");
+	while ((bytesRead = read(fdin, &in, sizeof(MSG))>0))
 	{
-		// falta por isto com forks e coletar e como modificar a arvore dentro do fork, n modifica o do pai 
-		// por isso n faz diferenca precisamos msm de ter fork ent?
+		//secure the number of son's processes
+		if (pidesCount >= PNUM)
+		{
+			int status;
+			for (int l = 0; l < PNUM; l++)
+			{
+				waitpid(pides[l], &status, 0);
+
+				if (WIFEXITED(status))
+				{
+					int code = WEXITSTATUS(status);
+					char soncode[255];
+					snprintf(soncode, 255, "Filho %d terminou com código %d\n", pides[l], code);
+					print_debug(soncode);
+				}
+			}
+			pidesCount = 0;
+		}
+		
 
 		print_debug("\n----New ITERATION----\n");
 
 		char outfifo[20];
 
 		snprintf(outfifo, sizeof(outfifo), "../fifos/output%d", in.pid);
-		if (mkfifo(outfifo, 0666) == -1)
-		{
-			if (errno != EEXIST)
-			{ // if the FIFO already exists no problem
-				perror("mkfifo outfifo(pid) failed");
-				return 1;
-			}
-		}
+		// if (mkfifo(outfifo, 0666) == -1)
+		// {
+		// 	if (errno != EEXIST)
+		// 	{ // if the FIFO already exists no problem
+		// 		perror("mkfifo outfifo(pid) failed");
+		// 		return 1;
+		// 	}
+		// }
 		int fdout = open(outfifo, O_WRONLY);
 		if (fdout == -1)
 		{
 			perror("open server to client fifo failed");
 		}
 
-		// Storing stdout fd
-		int original_stdout = dup(1);
-		if (original_stdout == -1)
-		{
-			perror("dup failed");
-			close(fdout);
-			return 1;
-		}
-		// Redirect stdout to the FIFO
-		if (dup2(fdout, 1) == -1)
-		{
-			perror("dup2 failed");
-		}
+		
+		
 
 		if (strcmp(in.flag, "-a") == 0)
 		{
+			if (pidesCount != 0)
+			{
+				int status;
+				for (int l = 0; l < PNUM; l++)
+				{
+					waitpid(pides[l], &status, 0);
+
+					if (WIFEXITED(status))
+					{
+						int code = WEXITSTATUS(status);
+						char soncode[255];
+						snprintf(soncode, 255, "Filho %d terminou com código %d\n", pides[l], code);
+						print_debug(soncode);
+					}
+				}
+				pidesCount = 0;
+			}
 			print_debug("-a executing\n");
 			Index *t;
+
 			t = malloc(sizeof(Index));
 			// turning the Msg into Index
 			strcpy(t->title, in.argv[0]);
 			strcpy(t->authors, in.argv[1]);
 			t->year = atoi(in.argv[2]);
-			strcpy(t->path, in.argv[3]);
-			indexDocument(indexTree, t);
+			char text[16];
+			strcpy(text, in.argv[3]);
+			snprintf(t->path, 64, "%s/%s", documentFolder, text);
+			indexDocument(indexTree, t,fdout);
 			print_debug("-a finished\n");
 		}
 		else if (strcmp(in.flag, "-c") == 0)
 		{
 			// done
-			print_debug("-c executing\n");
-			char title_ind[200];			// i gave this name because its a title index
-			strcpy(title_ind, in.argv[0]);	// Copy of the Key index to title_ind
-			checkKey(indexTree, title_ind); // check if meta information about a key is on the tree
-			print_debug("-c finished\n");
+			// fildes[0] le
+			// fildes[1] escreve
+
+			pid_t pid1 = fork();
+
+			if (pid1 == 0)
+			{
+				sleep(5);
+				print_debug("-c executing\n");
+				char title_ind[200];			// i gave this name because its a title index
+				strcpy(title_ind, in.argv[0]);	// Copy of the Key index to title_ind
+				checkKey(indexTree, title_ind,fdout); // check if meta information about a key is on the tree
+				print_debug("-c finished\n");
+				_exit(1);
+			}
+			pides[pidesCount++] = pid1;
 		}
 		else if (strcmp(in.flag, "-d") == 0)
 		{
@@ -97,40 +149,71 @@ int main(int argc, char *argv[])
 			print_debug("-d executing\n");
 			char title_ind[200]; // same as above
 			strcpy(title_ind, in.argv[0]);
-			deleteKey(indexTree, title_ind); // delete the meta information of key index from the tree if exists
+			deleteKey(indexTree, title_ind,fdout); // delete the meta information of key index from the tree if exists
 			print_debug("-d finished\n");
 		}
 		else if (strcmp(in.flag, "-l") == 0)
 		{
 			// done
-			print_debug("-l executing\n");
-			char title_ind[200]; // same as above
-			char word[200];
-			strcpy(title_ind, in.argv[0]);
-			strcpy(word, in.argv[1]);
-			searchKeywordByKey(indexTree, title_ind, word);
-			print_debug("-l finished\n");
+
+			pid_t pid1 = fork();
+
+			if (pid1 == 0)
+			{
+				print_debug("-l executing\n");
+				char title_ind[200]; // same as above
+				char word[200];
+				strcpy(title_ind, in.argv[0]);
+				strcpy(word, in.argv[1]);
+				searchKeywordByKey(indexTree, title_ind, word,fdout);
+				print_debug("-l finished\n");
+				_exit(1);
+			}
+			pides[pidesCount++] = pid1;
 		}
 		else if (strcmp(in.flag, "-s") == 0)
 		{
 			// done
-			print_debug("-s executing\n");
-			char word[200];
-			char numProc[100];
 
-			strcpy(word, in.argv[0]);
-			if(in.argc == 4) strcpy(numProc, in.argv[1]);
-			else sprintf(numProc, "%d", 1); // 1 process if number not given
+			pid_t pid1 = fork();
 
-			searchKeyword(indexTree, word, atoi(numProc));
-			print_debug("-s finished\n");
+			if (pid1 == 0)
+			{
+				print_debug("-s executing\n");
+				char word[200];
+				char numProc[100];
+				strcpy(word, in.argv[0]);
+				strcpy(numProc, in.argv[1]);
+				searchKeyword(indexTree, word, atoi(numProc),fdout);
+				print_debug("-s finished\n");
+				_exit(1);
+			}
+			pides[pidesCount++] = pid1;
 		}
 		else if (strcmp(in.flag, "-f") == 0)
 		{
 			// doing
+
+			if (pidesCount != 0)
+			{
+				int status;
+				for (int l = 0; l < PNUM; l++)
+				{
+					waitpid(pides[l], &status, 0);
+
+					if (WIFEXITED(status))
+					{
+						int code = WEXITSTATUS(status);
+						char soncode[255];
+						snprintf(soncode, 255, "Filho %d terminou com código %d\n", pides[l], code);
+						print_debug(soncode);
+					}
+				}
+				pidesCount = 0;
+			}
 			print_debug("-f executing\n");
-			
-			saveMetaInfo(indexTree);   // save the meta Information on a binary file for next time use
+
+			saveMetaInfo(indexTree,fdout);   // save the meta Information on a binary file for next time use
 			g_tree_destroy(indexTree); // free the tree
 			close(dummy_fd);		   // kills the dummy
 		}
@@ -144,25 +227,12 @@ int main(int argc, char *argv[])
 		{
 			perror("Tree is NULL (empty or not initialized).\n");
 		}
+
 		
-		fflush(stdout); // make sure it flushes immediately
+		close(fdout);
 		
 		
-		// Restoring the stdout fd
-		if (dup2(original_stdout, STDOUT_FILENO) == -1)
-		{
-			perror("dup2 back to original stdout failed");
-			close(fdout);
-			return 1;
-		}
-		if (close(fdout) == -1)
-		{
-			perror("close failed");
-		}
-		if (close(original_stdout) == -1)
-		{
-			perror("close failed");
-		}
+		
 	}
 
 	if (bytesRead == -1)
