@@ -200,44 +200,63 @@ int searchKeywordByKey(GTree *tree, char index[], char word[], int fdout)
 	return 0;
 }
 
-gint findWord(gpointer key, gpointer value, gpointer data)
+int foreachIndex(char *word, int numProc, int i, int fds[2])
 {
-	Index *idx = (Index *)value;   // get index content
-	DATA_W *info = (DATA_W *)data; // get data content
-
-	char *path = idx->path;		 // get path to the document
-	char *title = idx->title;
-	char *word = info->word;	 // get word to be searched
-
-	int numProc = info->numProc; // get number of processes
-	int i = info->id;
-	int *fds = info->fds;
-	
-
-	int fd = open(path, O_RDONLY);		 // file descriptor of document
-	off_t size = lseek(fd, 0, SEEK_END); // size of document
-	off_t chunk = size / numProc;		 // size of each part of the document that will be divided
-
-	int start = i * chunk;												// start point of reading
-	int end = (i == numProc - 1 ? size : start + chunk + sizeof(word)); // ending point of reading
-	int line_size = end - start;										// size to be read
-	char *line = malloc(line_size);										// buffer to save the read content
-
-	lseek(fd, start, SEEK_SET);
-
-	ssize_t n, bytes_read = 0;
-
-	while (bytes_read < line_size && (n = read(fd, line + bytes_read, line_size - bytes_read)) > 0) // reads a chunk of the document
+	int fdSave = open(SAVE_FILE, O_CREAT | O_RDONLY, 0666); // file descriptor to the save file
+	if (fdSave == -1)
 	{
-		bytes_read += n;
+		perror("Error opening the file\n");
+		return -1;
+	}
+	off_t size = lseek(fdSave, 0, SEEK_END); // to see if the save file has information
+	if (size == 0)
+	{
+		print_debug("Save file without information\n");
+		return 0;
+	}
+	lseek(fdSave, 0, SEEK_SET); // return to begin of file if the save file has information
+
+	off_t nIn = size / sizeof(Index);
+	for (off_t j = 0; j < nIn; j++)
+	{
+		ssize_t bytes_lidos;
+		Index *idx;
+		idx = malloc(sizeof(Index));
+		if ((bytes_lidos = read(fdSave, idx, sizeof(Index))) > 0) // for each index is called the indexDocument to construct the tree
+		{
+			char *path = idx->path;		 // get path to the document
+			char *title = idx->title;
+
+			int fd = open(path, O_RDONLY);		 // file descriptor of document
+			off_t size = lseek(fd, 0, SEEK_END); // size of document
+			off_t chunk = size / numProc;		 // size of each part of the document that will be divided
+
+			int start = i * chunk;												// start point of reading
+			int end = (i == numProc - 1 ? size : start + chunk + sizeof(word)); // ending point of reading
+			int line_size = end - start;										// size to be read
+			char *line = malloc(line_size);										// buffer to save the read content
+
+			lseek(fd, start, SEEK_SET);
+
+			ssize_t n, bytes_read = 0;
+
+			while (bytes_read < line_size && (n = read(fd, line + bytes_read, line_size - bytes_read)) > 0) // reads a chunk of the document
+			{
+				bytes_read += n;
+			}
+
+			if (strstr(line, word)) // if the word is found, write it on pipe
+			{
+				int len = strlen(title);
+				write(fds[1],&len,sizeof(len));
+				write(fds[1],title,len);
+			}
+
+			print_debug(idx->title);
+		}
 	}
 
-	if (strstr(line, word)) // if the word is found, write it on pipe
-	{
-		int len = strlen(title);
-		write(fds[1],&len,sizeof(len));
-		write(fds[1],title,len);
-	}
+	close(fdSave);
 	return 0;
 }
 
@@ -255,14 +274,10 @@ int searchKeyword(GTree *tree, char word[], int numProc, int fdout)
 		if (pids[i] == 0)
 		{
 			close(fds[i][0]);
-			DATA_W info; // struct to save the word to be searched, number of processes, file descriptors and process id
-			info.word = word;
-			info.numProc = numProc;
-			info.id = i;
-			info.fds[0] = fds[i][0];
-			info.fds[1] = fds[i][1];
 
-			g_tree_foreach(tree, findWord, &info); 
+			if(foreachIndex(word, numProc, i, fds[i]) < 0){
+				return -1;
+			}
 			
 			close(fds[i][1]);
 			_exit(0);
@@ -293,7 +308,6 @@ int searchKeyword(GTree *tree, char word[], int numProc, int fdout)
 			char *title = g_strdup(buff);
             g_hash_table_add(set, title);
 		}
-
 
 		close(fds[i][0]);
 	}
