@@ -8,6 +8,7 @@ typedef struct msg {
     char argv[4][200];
     int argc;
     pid_t pid;
+    off_t offset; // for dserver child to parent
 } MSG;
 
 

@@ -62,17 +62,19 @@ gint print_indexV2(gpointer value)
 	return 0;
 }
 
-int indexDocument(GTree *tree, Index *in, int fdout, int fdsavewr, int maxNodes, GQueue *insertionOrder)
+int indexDocument(GTree *tree, Index *in, int fdout, int fdsavewr, int maxNodes, GQueue *insertionOrder, int numNodes)
 {
 	char msg[300];
 	g_tree_insert(tree, g_strdup(in->title), in);
 	g_queue_push_tail(insertionOrder, in);
 	write(fdsavewr, in, sizeof(Index));
-	if (g_queue_get_length(insertionOrder) > maxNodes)
+	numNodes++;
+	if (numNodes > maxNodes)
 	{
 		Index *oldest = g_queue_pop_head(insertionOrder);
 		// free(oldest); // or reuse
 		g_tree_remove(tree, oldest->title);
+		numNodes--;
 	}
 
 	if (fdout != 0)
@@ -81,7 +83,7 @@ int indexDocument(GTree *tree, Index *in, int fdout, int fdsavewr, int maxNodes,
 		print_client(msg, fdout);
 	}
 	print_debug("Indexed Successfully\n");
-	return 0;
+	return numNodes;
 }
 
 int indexDocumentBuild(GTree *tree, Index *in, int fdout)
@@ -99,7 +101,7 @@ int indexDocumentBuild(GTree *tree, Index *in, int fdout)
 
 int checkKey(GTree *tree, char index[], int fdout)
 {
-	// Doing
+	// falta retornar oq encontrou ou seja o offset
 	gpointer exist;
 	exist = g_tree_lookup(tree, g_strdup(index)); // search on the tree to see if the key index exists (returns Node if exists|NULL if don't exists)
 
@@ -111,6 +113,7 @@ int checkKey(GTree *tree, char index[], int fdout)
 		Index temp;
 		lseek(fdsave, 0, SEEK_SET); // rewind file descriptor to beginning
 
+		off_t off = 0;
 		while (read(fdsave, &temp, sizeof(Index)) == sizeof(Index))
 		{
 			if (strcmp(temp.title, index) == 0)
@@ -120,10 +123,21 @@ int checkKey(GTree *tree, char index[], int fdout)
 				snprintf(msg, sizeof(msg), "Meta Information requested:\nTitle: %s\nAuthor: %s\nYear: %d\nPath: %s\n", temp.title, temp.authors, temp.year, temp.path);
 				print_client(msg, fdout);
 
+				int rfd = open(C_TO_S, O_WRONLY);
+				if (rfd == -1)
+				{
+					perror("open rfd failed");
+				}
 				MSG r;
+				strcpy(r.flag, "r");
+				r.offset = off;
+				r.pid = getpid();
+				write(rfd, &r, sizeof(MSG));
 				// falta dar return ao offset e fazer o resto
+				close(rfd);
 				return 1;
 			}
+			off += sizeof(Index);
 		}
 
 		print_client("Meta Information about the requested index was not found\n", fdout);
@@ -393,8 +407,6 @@ int buildMetaInfo(GTree *tree, int fd, int maxNodes, GQueue *insertionOrder)
 			g_queue_push_tail(insertionOrder, temp);
 		}
 	}
-
-	close(fd);
 	// int fd_clean = open(SAVE_FILE, O_WRONLY | O_TRUNC, 0666); // O_TRUNC cleans the file
 	// if (fd_clean != -1)
 	// {
