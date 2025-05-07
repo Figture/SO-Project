@@ -62,12 +62,12 @@ gint print_indexV2(gpointer value)
 	return 0;
 }
 
-void print_index_queue(gpointer data, gpointer user_data) {
-    Index *idx = (Index *)data;
-    printf("Title: %s | Authors: %s | Year: %d | Path: %s\n",
-           idx->title, idx->authors, idx->year, idx->path);
+void print_index_queue(gpointer data, gpointer user_data)
+{
+	Index *idx = (Index *)data;
+	printf("Title: %s | Authors: %s | Year: %d | Path: %s\n",
+		   idx->title, idx->authors, idx->year, idx->path);
 }
-
 
 int indexDocument(GTree *tree, Index *in, int fdout, int fdsavewr, int maxNodes, GQueue *insertionOrder, int numNodes)
 {
@@ -169,7 +169,8 @@ int deleteKey(GTree *tree, char index[], int fdout, int fdsave, GQueue *insertio
 	gboolean deleted;
 	gpointer exist;
 	exist = g_tree_lookup(tree, index);
-	if (exist != NULL) {
+	if (exist != NULL)
+	{
 		numNodes--;
 		g_queue_remove(insertionOrder, exist);
 	}

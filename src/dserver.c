@@ -74,11 +74,6 @@ int main(int argc, char *argv[])
 			
 			Index *temp = malloc(sizeof(Index));
 			// seek the found one
-			struct stat st;
-			fstat(fdsave, &st);
-			if (!S_ISREG(st.st_mode)) {
-				fprintf(stderr, "fdsave is not a regular file!\n");
-			}
 			off_t res = lseek(fdsave, in.offset, SEEK_SET);
 			if (res == -1) {
 				perror("lseek failed");
