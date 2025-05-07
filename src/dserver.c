@@ -16,11 +16,16 @@ int main(int argc, char *argv[])
 	{
 		strcpy(documentFolder, "");
 	}
+	int maxNodes = atoi(argv[2]);
+
 	print_debug("SERVER LAUNCHED\n");
 	GTree *indexTree = g_tree_new_full(compare_str, NULL, g_free, g_free);
+	// FIFO Implementation
+	GQueue *insertionOrder = g_queue_new();
 
+	int fdsave = open(SAVE_FILE, O_CREAT | O_RDONLY, 0666); // file descriptor to the save file
 	print_debug("Searching for Meta Information on Saves\n");
-	buildMetaInfo(indexTree);
+	buildMetaInfo(indexTree, fdsave, maxNodes);
 
 	// make fifo e o loop com o dummy
 	if (mkfifo(C_TO_S, 0666) == -1)

@@ -2,7 +2,7 @@
 
 void print_debug(const char *msg)
 {
-	// this function is to print on stderr and make it red color
+	// trocar de volta para stdout em vez de stderr? pq ja temos o stdout livre
 	write(2, "\033[96m", 5);
 	write(2, msg, strlen(msg));
 	write(2, "\033[0m", 4);
@@ -324,9 +324,9 @@ int saveMetaInfo(GTree *tree,int fdout)
 	return 0;
 }
 
-int buildMetaInfo(GTree *tree)
+int buildMetaInfo(GTree *tree, int fd, int maxNodes, GQueue *insertionOrder)
 {
-	int fd = open(SAVE_FILE, O_CREAT | O_RDONLY, 0666); // file descriptor to the save file
+	
 	if (fd == -1)
 	{
 		perror("Error opening the file\n");
