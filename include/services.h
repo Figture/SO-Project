@@ -30,11 +30,13 @@ gint print_index(gpointer key, gpointer value, gpointer data);
 
 gint print_index_debug(gpointer key, gpointer value, gpointer data);
 
+void print_index_queue(gpointer data, gpointer user_data);
+
 int indexDocument(GTree *tree, Index *in, int fdout, int fdsave, int maxNodes, GQueue *insertionOrder, int numNodes);
 
 int checkKey(GTree *tree, char index[], int fdout);
 
-int deleteKey(GTree *tree, char index[],int fdout);
+int deleteKey(GTree *tree, char index[], int fdout, int fdsave, GQueue *insertionOrder, int numNodes);
 
 int searchKeywordByKey(GTree *tree, char index[], char word[],int fdout);
 

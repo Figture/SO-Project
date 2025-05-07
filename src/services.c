@@ -62,6 +62,13 @@ gint print_indexV2(gpointer value)
 	return 0;
 }
 
+void print_index_queue(gpointer data, gpointer user_data) {
+    Index *idx = (Index *)data;
+    printf("Title: %s | Authors: %s | Year: %d | Path: %s\n",
+           idx->title, idx->authors, idx->year, idx->path);
+}
+
+
 int indexDocument(GTree *tree, Index *in, int fdout, int fdsavewr, int maxNodes, GQueue *insertionOrder, int numNodes)
 {
 	char msg[300];
@@ -155,11 +162,18 @@ int checkKey(GTree *tree, char index[], int fdout)
 	return 1;
 }
 
-int deleteKey(GTree *tree, char index[], int fdout)
+int deleteKey(GTree *tree, char index[], int fdout, int fdsave, GQueue *insertionOrder, int numNodes)
 {
+	// falta dar print ao cliente dizer qnd n encontrou para dar delete
 	// doing
 	gboolean deleted;
-	deleted = g_tree_remove(tree, g_strdup(index)); // search on the tree to see if the key index exists and removes the Node if exists return (True if removed|False if don't exists)
+	gpointer exist;
+	exist = g_tree_lookup(tree, index);
+	if (exist != NULL) {
+		numNodes--;
+		g_queue_remove(insertionOrder, exist);
+	}
+	deleted = g_tree_remove(tree, index); // search on the tree to see if the key index exists and removes the Node if exists return (True if removed|False if don't exists)
 	if (deleted != TRUE)
 	{
 		print_debug("The Index was not found on cache\n");
@@ -173,12 +187,11 @@ int deleteKey(GTree *tree, char index[], int fdout)
 	}
 
 	// now we need to delete it from the disk
-	int fdsave = open(SAVE_FILE, O_RDONLY);
 	int fdtemp = open("temp_save.bin", O_CREAT | O_WRONLY | O_TRUNC, 0666);
-	if (fdsave == -1 || fdtemp == -1)
+	if (fdtemp == -1)
 	{
 		perror("Failed to open files");
-		return -1;
+		return numNodes;
 	}
 	Index temp;
 	lseek(fdsave, 0, SEEK_SET); // rewind file descriptor to beginning
@@ -195,13 +208,12 @@ int deleteKey(GTree *tree, char index[], int fdout)
 			write(fdtemp, &temp, sizeof(Index));
 		}
 	}
-	close(fdsave);
 	close(fdtemp);
 
 	// after copying everything we replace it
 	rename("temp_save.bin", SAVE_FILE);
 
-	return 0;
+	return numNodes;
 }
 
 int searchKeywordByKey(GTree *tree, char index[], char word[], int fdout)
@@ -211,8 +223,40 @@ int searchKeywordByKey(GTree *tree, char index[], char word[], int fdout)
 
 	if (exist == NULL)
 	{
-		print_client("Meta Information about the requested index was not found\n", fdout);
-		return -1;
+		int fdsave = open(SAVE_FILE, O_RDONLY, 0666);
+		Index temp;
+		lseek(fdsave, 0, SEEK_SET); // rewind file descriptor to beginning
+		int found = 0;
+
+		off_t off = 0;
+		while (read(fdsave, &temp, sizeof(Index)) == sizeof(Index) && !found)
+		{
+			if (strcmp(temp.title, index) == 0)
+			{
+				print_debug("Meta Information about the requested index was found on disk\n ");
+				exist = &temp;
+				found = 1;
+				int rfd = open(C_TO_S, O_WRONLY);
+				if (rfd == -1)
+				{
+					perror("open rfd failed");
+				}
+				MSG r;
+				strcpy(r.flag, "r");
+				r.offset = off;
+				r.pid = getpid();
+				write(rfd, &r, sizeof(MSG));
+				close(rfd);
+				break;
+			}
+			off += sizeof(Index);
+		}
+		close(fdsave);
+		if (!found)
+		{
+			print_client("Meta Information about the requested index was not found\n", fdout);
+			return -1;
+		}
 	}
 
 	Index *idx = (Index *)exist; // get index content

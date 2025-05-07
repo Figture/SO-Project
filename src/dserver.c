@@ -55,6 +55,7 @@ int main(int argc, char *argv[])
 	{
 		if (strcmp("r", in.flag) == 0)
 		{
+			// ao dar -d, isto n ta a dar update direito
 			print_debug("--updating the fifo--\n");
 			// whenever it needs to reload the FIFO, wait for the child who requested it
 			int status;
@@ -215,7 +216,7 @@ int main(int argc, char *argv[])
 				print_debug("-d executing\n");
 				char title_ind[200]; // same as above
 				strcpy(title_ind, in.argv[0]);
-				deleteKey(indexTree, title_ind, fdout); // delete the meta information of key index from the tree if exists
+				numNodes = deleteKey(indexTree, title_ind, fdout, fdsave, insertionOrder, numNodes); // delete the meta information of key index from the tree if exists
 				print_debug("-d finished\n");
 			}
 			else if (strcmp(in.flag, "-l") == 0)
@@ -294,6 +295,8 @@ int main(int argc, char *argv[])
 		{
 			perror("Tree is NULL (empty or not initialized).\n");
 		}
+		printf("=== Queue Contents ===\n");
+		g_queue_foreach(insertionOrder, print_index_queue, NULL);
 	}
 
 	if (bytesRead == -1)
