@@ -5,6 +5,7 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <glib.h>
+#include "defs.h"
 
 typedef struct index{
 	char title[200];
@@ -29,9 +30,11 @@ gint print_index(gpointer key, gpointer value, gpointer data);
 
 gint print_index_debug(gpointer key, gpointer value, gpointer data);
 
-int indexDocument(GTree *tree, Index *in,int fdout);
+int indexDocument(GTree *tree, Index *in, int fdout, int fdsave, int maxNodes, GQueue *insertionOrder);
 
-int checkKey(GTree *tree, char index[],int fdout);
+int indexDocumentBuild(GTree *tree, Index *in,int fdout);
+
+int checkKey(GTree *tree, char index[], int fdout);
 
 int deleteKey(GTree *tree, char index[],int fdout);
 
@@ -41,7 +44,7 @@ int searchKeyword(GTree *tree, char word[], int numProc,int fdout);
 
 int saveMetaInfo(GTree *tree,int fdout);
 
-int buildMetaInfo(GTree *tree);
+int buildMetaInfo(GTree *tree, int fd, int maxNodes, GQueue *insertionOrder);
 
 gint findWord(gpointer key, gpointer value, gpointer data);
 

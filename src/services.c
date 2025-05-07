@@ -62,7 +62,29 @@ gint print_indexV2(gpointer value)
 	return 0;
 }
 
-int indexDocument(GTree *tree, Index *in, int fdout)
+int indexDocument(GTree *tree, Index *in, int fdout, int fdsavewr, int maxNodes, GQueue *insertionOrder)
+{
+	char msg[300];
+	g_tree_insert(tree, g_strdup(in->title), in);
+	g_queue_push_tail(insertionOrder, in);
+	write(fdsavewr, in, sizeof(Index));
+	if (g_queue_get_length(insertionOrder) > maxNodes)
+	{
+		Index *oldest = g_queue_pop_head(insertionOrder);
+		// free(oldest); // or reuse
+		g_tree_remove(tree, oldest->title);
+	}
+
+	if (fdout != 0)
+	{
+		snprintf(msg, sizeof(msg), "Indexed \"%s\" Successfully\n", in->title);
+		print_client(msg, fdout);
+	}
+	print_debug("Indexed Successfully\n");
+	return 0;
+}
+
+int indexDocumentBuild(GTree *tree, Index *in, int fdout)
 {
 	char msg[300];
 	g_tree_insert(tree, g_strdup(in->title), in);
@@ -84,7 +106,25 @@ int checkKey(GTree *tree, char index[], int fdout)
 	if (exist == NULL)
 	{
 
-		print_debug("Meta Information about the requested index was not found\n");
+		print_debug("Meta Information about the requested index was not found on cache\n");
+		int fdsave = open(SAVE_FILE, O_RDONLY, 0666);
+		Index temp;
+		lseek(fdsave, 0, SEEK_SET); // rewind file descriptor to beginning
+
+		while (read(fdsave, &temp, sizeof(Index)) == sizeof(Index))
+		{
+			if (strcmp(temp.title, index) == 0)
+			{
+				print_debug("Meta Information about the requested index was found on file\n ");
+				char msg[600];
+				snprintf(msg, sizeof(msg), "Meta Information requested:\nTitle: %s\nAuthor: %s\nYear: %d\nPath: %s\n", temp.title, temp.authors, temp.year, temp.path);
+				print_client(msg, fdout);
+
+				MSG r;
+				// falta dar return ao offset e fazer o resto
+				return 1;
+			}
+		}
 
 		print_client("Meta Information about the requested index was not found\n", fdout);
 	}
@@ -280,15 +320,13 @@ int searchKeyword(GTree *tree, char word[], int numProc, int fdout)
 		Index *idx = (Index *)l->data;
 		if (l->next == NULL)
 		{
-			snprintf(msg, sizeof(msg),"%s", (char *)idx->title);
-			print_client(msg,fdout);
-			
+			snprintf(msg, sizeof(msg), "%s", (char *)idx->title);
+			print_client(msg, fdout);
 		}
 		else
 		{
-			snprintf(msg, sizeof(msg),"%s, ", (char *)idx->title);
-			print_client(msg,fdout);
-			
+			snprintf(msg, sizeof(msg), "%s, ", (char *)idx->title);
+			print_client(msg, fdout);
 		}
 	}
 	print_client("]\n", fdout);
@@ -317,16 +355,16 @@ gint saveMetaInfoNode(gpointer key, gpointer value, gpointer data)
 	return 0;
 }
 
-int saveMetaInfo(GTree *tree,int fdout)
+int saveMetaInfo(GTree *tree, int fdout)
 {
-	print_client("Server is shuting down \n",fdout);
+	print_client("Server is shuting down \n", fdout);
 	g_tree_foreach(tree, saveMetaInfoNode, NULL); // for each node its called saveMetaInfoNode to save the Index on the binary file
 	return 0;
 }
 
 int buildMetaInfo(GTree *tree, int fd, int maxNodes, GQueue *insertionOrder)
 {
-	
+
 	if (fd == -1)
 	{
 		perror("Error opening the file\n");
@@ -340,9 +378,9 @@ int buildMetaInfo(GTree *tree, int fd, int maxNodes, GQueue *insertionOrder)
 	}
 	lseek(fd, 0, SEEK_SET); // return to begin of file if the save file has information
 	off_t nIn = size / sizeof(Index);
-	for (off_t i = 0; i < nIn; i++)
+	int r;
+	for (r = 0; r < nIn && r < maxNodes; r++)
 	{
-
 		ssize_t bytes_lidos;
 		Index *temp;
 		temp = malloc(sizeof(Index));
@@ -350,21 +388,23 @@ int buildMetaInfo(GTree *tree, int fd, int maxNodes, GQueue *insertionOrder)
 		{
 
 			print_debug("indexed one Index\n");
-			indexDocument(tree, temp, 0);
+			// indexDocumentBuild(tree, temp, 0, fdsave);
+			g_tree_insert(tree, g_strdup(temp->title), temp);
+			g_queue_push_tail(insertionOrder, temp);
 		}
 	}
 
 	close(fd);
-	int fd_clean = open(SAVE_FILE, O_WRONLY | O_TRUNC, 0666); // O_TRUNC cleans the file
-	if (fd_clean != -1)
-	{
-		// file is empty
-		print_debug("after building the tree the save file is cleaned\n");
-		close(fd_clean);
-	}
+	// int fd_clean = open(SAVE_FILE, O_WRONLY | O_TRUNC, 0666); // O_TRUNC cleans the file
+	// if (fd_clean != -1)
+	// {
+	// 	// file is empty
+	// 	print_debug("after building the tree the save file is cleaned\n");
+	// 	close(fd_clean);
+	// }
 
 	print_debug("PRINTING TREE:\n"); // print the tree to know how many nodes it has and the metainformation
 	g_tree_foreach(tree, print_index_debug, NULL);
 
-	return 0;
+	return r;
 }

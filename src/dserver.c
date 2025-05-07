@@ -1,5 +1,4 @@
 #include "services.h"
-#include "defs.h"
 
 int main(int argc, char *argv[])
 {
@@ -23,9 +22,10 @@ int main(int argc, char *argv[])
 	// FIFO Implementation
 	GQueue *insertionOrder = g_queue_new();
 
-	int fdsave = open(SAVE_FILE, O_CREAT | O_RDONLY, 0666); // file descriptor to the save file
+	int fdsave = open(SAVE_FILE, O_CREAT | O_RDWR, 0666); // file descriptor to the save file
 	print_debug("Searching for Meta Information on Saves\n");
-	buildMetaInfo(indexTree, fdsave, maxNodes);
+	int numNodes = buildMetaInfo(indexTree, fdsave, maxNodes, insertionOrder);
+	// lseek(fdsave, 0, SEEK_END);
 
 	// make fifo e o loop com o dummy
 	if (mkfifo(C_TO_S, 0666) == -1)
@@ -50,7 +50,7 @@ int main(int argc, char *argv[])
 	
 	MSG in;
 	ssize_t bytesRead;
-	printf("Vou ler\n");
+	// printf("Vou ler\n");
 	while ((bytesRead = read(fdin, &in, sizeof(MSG))>0))
 	{
 		//secure the number of son's processes
@@ -125,7 +125,7 @@ int main(int argc, char *argv[])
 			char text[16];
 			strcpy(text, in.argv[3]);
 			snprintf(t->path, 64, "%s/%s", documentFolder, text);
-			indexDocument(indexTree, t,fdout);
+			indexDocument(indexTree, t, fdout, fdsave, maxNodes, insertionOrder);
 			print_debug("-a finished\n");
 		}
 		else if (strcmp(in.flag, "-c") == 0)
@@ -138,11 +138,11 @@ int main(int argc, char *argv[])
 
 			if (pid1 == 0)
 			{
-				sleep(5);
+				// sleep(5);
 				print_debug("-c executing\n");
 				char title_ind[200];			// i gave this name because its a title index
 				strcpy(title_ind, in.argv[0]);	// Copy of the Key index to title_ind
-				checkKey(indexTree, title_ind,fdout); // check if meta information about a key is on the tree
+				checkKey(indexTree, title_ind, fdout); // check if meta information about a key is on the tree
 				print_debug("-c finished\n");
 				_exit(1);
 			}
@@ -154,7 +154,7 @@ int main(int argc, char *argv[])
 			print_debug("-d executing\n");
 			char title_ind[200]; // same as above
 			strcpy(title_ind, in.argv[0]);
-			deleteKey(indexTree, title_ind,fdout); // delete the meta information of key index from the tree if exists
+			deleteKey(indexTree, title_ind, fdout); // delete the meta information of key index from the tree if exists
 			print_debug("-d finished\n");
 		}
 		else if (strcmp(in.flag, "-l") == 0)
@@ -218,7 +218,7 @@ int main(int argc, char *argv[])
 			}
 			print_debug("-f executing\n");
 
-			saveMetaInfo(indexTree,fdout);   // save the meta Information on a binary file for next time use
+			// saveMetaInfo(indexTree,fdout);   // save the meta Information on a binary file for next time use
 			g_tree_destroy(indexTree); // free the tree
 			close(dummy_fd);		   // kills the dummy
 		}
@@ -246,6 +246,7 @@ int main(int argc, char *argv[])
 	}
 
 	close(fdin);
+	close(fdsave);
 
 	if (unlink(C_TO_S) == -1)
 	{
