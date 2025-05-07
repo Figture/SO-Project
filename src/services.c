@@ -206,92 +206,123 @@ gint findWord(gpointer key, gpointer value, gpointer data)
 	DATA_W *info = (DATA_W *)data; // get data content
 
 	char *path = idx->path;		 // get path to the document
+	char *title = idx->title;
 	char *word = info->word;	 // get word to be searched
+
 	int numProc = info->numProc; // get number of processes
+	int i = info->id;
+	int *fds = info->fds;
+	
 
 	int fd = open(path, O_RDONLY);		 // file descriptor of document
 	off_t size = lseek(fd, 0, SEEK_END); // size of document
 	off_t chunk = size / numProc;		 // size of each part of the document that will be divided
 
-	pid_t pids[numProc];
-	for (int i = 0; i < numProc; i++)
+	int start = i * chunk;												// start point of reading
+	int end = (i == numProc - 1 ? size : start + chunk + sizeof(word)); // ending point of reading
+	int line_size = end - start;										// size to be read
+	char *line = malloc(line_size);										// buffer to save the read content
+
+	lseek(fd, start, SEEK_SET);
+
+	ssize_t n, bytes_read = 0;
+
+	while (bytes_read < line_size && (n = read(fd, line + bytes_read, line_size - bytes_read)) > 0) // reads a chunk of the document
 	{
-		pids[i] = fork();
-		if (pids[i] < 0)
-			perror("Fork failed");
-		if (pids[i] == 0)
-		{
-			// CHILD
-			int start = i * chunk;												// start point of reading
-			int end = (i == numProc - 1 ? size : start + chunk + sizeof(word)); // ending point of reading
-			int line_size = end - start;										// size to be read
-			char *line = malloc(line_size);										// buffer to save the read content
-
-			lseek(fd, start, SEEK_SET);
-
-			ssize_t n, bytes_read = 0;
-
-			while (bytes_read < line_size && (n = read(fd, line + bytes_read, line_size - bytes_read)) > 0) // reads a chunk of the document
-			{
-				bytes_read += n;
-			}
-
-			if (strstr(line, word)) // checks if the word was found
-				_exit(1);
-			_exit(-1);
-		}
+		bytes_read += n;
 	}
 
-	// PARENT
-	int found = 0;
-	for (int i = 0; i < numProc; i++) // for each child process, check if word was found
+	if (strstr(line, word)) // if the word is found, write it on pipe
 	{
-		int status;
-		wait(&status);
-		if (WIFEXITED(status))
-		{
-			int rel_val = WEXITSTATUS(status);
-			if (rel_val < 255)
-				found = 1;
-		}
+		int len = strlen(title);
+		write(fds[1],&len,sizeof(len));
+		write(fds[1],title,len);
 	}
-
-	if (found) // if it was found, add it to the list
-	{
-		info->indexList = g_list_append(info->indexList, value);
-	}
-
 	return 0;
 }
 
 int searchKeyword(GTree *tree, char word[], int numProc, int fdout)
 {
-	DATA_W info; // struct to save the word to be searched, number of processes and list of indexs
-	info.word = word;
-	info.numProc = numProc;
-	info.indexList = NULL;
-
-	g_tree_foreach(tree, findWord, &info); // search all indexs that contain word
-
-	print_client("[", fdout);
-	for (GList *l = info.indexList; l != NULL; l = l->next)
+	int fds[numProc][2]; // file descriptors for pipe of each child process
+	pid_t pids[numProc];
+	
+	for (int i = 0; i < numProc; i++)
 	{
-		char msg[220];
-		Index *idx = (Index *)l->data;
-		if (l->next == NULL)
+		if(pipe(fds[i])<0) perror("Pipe failed");
+
+		if ((pids[i] = fork()) < 0) perror("Fork failed");
+
+		if (pids[i] == 0)
 		{
-			snprintf(msg, sizeof(msg),"%s", (char *)idx->title);
-			print_client(msg,fdout);
+			close(fds[i][0]);
+			DATA_W info; // struct to save the word to be searched, number of processes, file descriptors and process id
+			info.word = word;
+			info.numProc = numProc;
+			info.id = i;
+			info.fds[0] = fds[i][0];
+			info.fds[1] = fds[i][1];
+
+			g_tree_foreach(tree, findWord, &info); 
 			
+			close(fds[i][1]);
+			_exit(0);
 		}
-		else
-		{
-			snprintf(msg, sizeof(msg),"%s, ", (char *)idx->title);
-			print_client(msg,fdout);
 			
+		close(fds[i][1]);
+	}
+
+
+	for (int i = 0; i < numProc; i++) // wait for each child process
+	{
+		wait(NULL);
+	}
+
+	GHashTable *set = g_hash_table_new_full(g_str_hash, g_str_equal,  g_free, NULL); // hash table that acts like a set, so no duplicates
+
+	for(int i = 0; i < numProc; i++){
+		char buff[200];
+		
+		while(1){  // reads all titles of a given child process
+			int len; ssize_t bytes_read = read(fds[i][0],&len,sizeof(len));
+			if(bytes_read==0) break;
+			if(len >= sizeof(buff)) len = sizeof(buff)-1; // if doesn't fit buffer, it reads what bytes fit on it
+ 
+			bytes_read = read(fds[i][0], buff, len);
+
+			buff[len] = '\0';
+			char *title = g_strdup(buff);
+            g_hash_table_add(set, title);
+		}
+
+
+		close(fds[i][0]);
+	}
+
+	GHashTableIter iter;
+	gpointer key;
+
+	guint total = g_hash_table_size(set);
+	guint index = 0;
+
+	char msg[220];
+
+	g_hash_table_iter_init(&iter, set);
+	print_client("[", fdout);
+	while(g_hash_table_iter_next(&iter, &key, NULL)){ // print each key in the hash table
+		index++;
+		char *title = (char *)key;
+	
+		if(index == total){
+			sprintf(msg,"%s", title);
+    		print_client(msg, fdout);
+		}else{
+			sprintf(msg,"%s, ", title);
+    		print_client(msg, fdout);
 		}
 	}
 	print_client("]\n", fdout);
+	g_hash_table_destroy(set); 
+
 	return 0;
 }
 
