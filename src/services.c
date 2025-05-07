@@ -128,18 +128,20 @@ int checkKey(GTree *tree, char index[], int fdout)
 				{
 					perror("open rfd failed");
 				}
+				// writting the offset to the parent
 				MSG r;
 				strcpy(r.flag, "r");
 				r.offset = off;
 				r.pid = getpid();
 				write(rfd, &r, sizeof(MSG));
-				// falta dar return ao offset e fazer o resto
+
+				close(fdsave);
 				close(rfd);
 				return 1;
 			}
 			off += sizeof(Index);
 		}
-
+		close(fdsave);
 		print_client("Meta Information about the requested index was not found\n", fdout);
 	}
 	else
@@ -150,7 +152,7 @@ int checkKey(GTree *tree, char index[], int fdout)
 		print_client(msg, fdout);
 		print_debug("Meta Information about the requested index was found\n ");
 	}
-	return 0;
+	return 1;
 }
 
 int deleteKey(GTree *tree, char index[], int fdout)
@@ -160,8 +162,7 @@ int deleteKey(GTree *tree, char index[], int fdout)
 	deleted = g_tree_remove(tree, g_strdup(index)); // search on the tree to see if the key index exists and removes the Node if exists return (True if removed|False if don't exists)
 	if (deleted != TRUE)
 	{
-		print_debug("The Index was not found, so It cannot be deleted\n"); // if the function doesn't found the key index it doesn't remove anything
-		print_client("The Index was not found, so It cannot be deleted\n", fdout);
+		print_debug("The Index was not found on cache\n");
 	}
 	else
 	{
@@ -170,6 +171,35 @@ int deleteKey(GTree *tree, char index[], int fdout)
 		snprintf(msg, sizeof(msg), "Index entry %s deleted\n", index);
 		print_client(msg, fdout);
 	}
+
+	// now we need to delete it from the disk
+	int fdsave = open(SAVE_FILE, O_RDONLY);
+	int fdtemp = open("temp_save.bin", O_CREAT | O_WRONLY | O_TRUNC, 0666);
+	if (fdsave == -1 || fdtemp == -1)
+	{
+		perror("Failed to open files");
+		return -1;
+	}
+	Index temp;
+	lseek(fdsave, 0, SEEK_SET); // rewind file descriptor to beginning
+
+	while (read(fdsave, &temp, sizeof(Index)) == sizeof(Index))
+	{
+		if (strcmp(temp.title, index) == 0)
+		{
+			// when it is found we dont have to write it
+			print_debug("The index was found on disk and deleted\n");
+		}
+		else
+		{
+			write(fdtemp, &temp, sizeof(Index));
+		}
+	}
+	close(fdsave);
+	close(fdtemp);
+
+	// after copying everything we replace it
+	rename("temp_save.bin", SAVE_FILE);
 
 	return 0;
 }

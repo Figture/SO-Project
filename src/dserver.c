@@ -68,8 +68,8 @@ int main(int argc, char *argv[])
 				print_debug(soncode);
 			}
 			// if the parent didnt wait, discount it but still need to remove it... so need to fix
-			if (pidesCount != 0)
-				pidesCount--;
+			// if (pidesCount != 0)
+			// 	pidesCount--;
 			
 			Index *temp = malloc(sizeof(Index));
 			// seek the found one
@@ -105,7 +105,7 @@ int main(int argc, char *argv[])
 			if (pidesCount >= PNUM)
 			{
 				int status;
-				for (int l = 0; l < PNUM; l++)
+				for (int l = 0; l < pidesCount; l++)
 				{
 					waitpid(pides[l], &status, 0);
 
@@ -143,7 +143,7 @@ int main(int argc, char *argv[])
 				if (pidesCount != 0)
 				{
 					int status;
-					for (int l = 0; l < PNUM; l++)
+					for (int l = 0; l < pidesCount; l++)
 					{
 						waitpid(pides[l], &status, 0);
 
@@ -194,7 +194,24 @@ int main(int argc, char *argv[])
 			}
 			else if (strcmp(in.flag, "-d") == 0)
 			{
-				// done
+				// after the other child operations we can delete
+				if (pidesCount != 0)
+				{
+					int status;
+					for (int l = 0; l < pidesCount; l++)
+					{
+						waitpid(pides[l], &status, 0);
+
+						if (WIFEXITED(status))
+						{
+							int code = WEXITSTATUS(status);
+							char soncode[255];
+							snprintf(soncode, 255, "Filho %d terminou com código %d\n", pides[l], code);
+							print_debug(soncode);
+						}
+					}
+					pidesCount = 0;
+				}
 				print_debug("-d executing\n");
 				char title_ind[200]; // same as above
 				strcpy(title_ind, in.argv[0]);
@@ -203,8 +220,6 @@ int main(int argc, char *argv[])
 			}
 			else if (strcmp(in.flag, "-l") == 0)
 			{
-				// done
-
 				pid_t pid1 = fork();
 
 				if (pid1 == 0)
@@ -246,7 +261,7 @@ int main(int argc, char *argv[])
 				if (pidesCount != 0)
 				{
 					int status;
-					for (int l = 0; l < PNUM; l++)
+					for (int l = 0; l < pidesCount; l++)
 					{
 						waitpid(pides[l], &status, 0);
 
