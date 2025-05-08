@@ -17,7 +17,8 @@ typedef struct index{
 typedef struct data_word{
     char *word;
 	int numProc;
-	GList *indexList;
+	int id;
+	int fds[2];
 } DATA_W;
 
 #define SAVE_FILE "../saves"// Save file to save meta information presented on the tree

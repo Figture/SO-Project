@@ -237,22 +237,24 @@ int main(int argc, char *argv[])
 
 				pid_t pid1 = fork();
 
-				if (pid1 == 0)
-				{
-					print_debug("-s executing\n");
-					char word[200];
-					char numProc[100];
-					strcpy(word, in.argv[0]);
-					strcpy(numProc, in.argv[1]);
-					searchKeyword(indexTree, word, atoi(numProc), fdout);
-					print_debug("-s finished\n");
-					_exit(1);
-				}
-				pides[pidesCount++] = pid1;
-			}
-			else if (strcmp(in.flag, "-f") == 0)
+			if (pid1 == 0)
 			{
-				// doing
+				print_debug("-s executing\n");
+				char word[200];
+				char numProc[100];
+				strcpy(word, in.argv[0]);
+				if(in.argc == 4) strcpy(numProc, in.argv[1]);
+				else sprintf(numProc, "%d", 1); // 1 process if number not given
+
+				searchKeyword(indexTree, word, atoi(numProc),fdout);
+				print_debug("-s finished\n");
+				_exit(1);
+			}
+			pides[pidesCount++] = pid1;
+		}
+		else if (strcmp(in.flag, "-f") == 0)
+		{
+			// doing
 
 				if (pidesCount != 0)
 				{
