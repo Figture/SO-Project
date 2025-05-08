@@ -165,7 +165,7 @@ int main(int argc, char *argv[])
 				char text[16];
 				strcpy(text, in.argv[3]);
 				snprintf(t->path, 64, "%s/%s", documentFolder, text);
-				numNodes = indexDocument(indexTree, t, fdout, fdsave, maxNodes, insertionOrder, numNodes);
+				numNodes = indexDocument(indexTree, t, fdout, maxNodes, insertionOrder, numNodes);
 				print_debug("-a finished\n");
 			}
 			else if (strcmp(in.flag, "-c") == 0)
@@ -249,7 +249,7 @@ int main(int argc, char *argv[])
 					else
 						sprintf(numProc, "%d", 1); // 1 process if number not given
 
-					searchKeyword(indexTree, word, atoi(numProc), fdout);
+					searchKeyword(word, atoi(numProc), fdout);
 					print_debug("-s finished\n");
 					_exit(1);
 				}

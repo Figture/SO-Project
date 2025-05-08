@@ -65,16 +65,20 @@ gint print_indexV2(gpointer value)
 void print_index_queue(gpointer data, gpointer user_data)
 {
 	Index *idx = (Index *)data;
-	printf("Title: %s | Authors: %s | Year: %d | Path: %s\n",
-		   idx->title, idx->authors, idx->year, idx->path);
+	if (idx->title != NULL)
+	{
+		printf("Title: %s | Authors: %s | Year: %d | Path: %s\n",
+			   idx->title, idx->authors, idx->year, idx->path);
+	}
 }
 
-int indexDocument(GTree *tree, Index *in, int fdout, int fdsavewr, int maxNodes, GQueue *insertionOrder, int numNodes)
+int indexDocument(GTree *tree, Index *in, int fdout, int maxNodes, GQueue *insertionOrder, int numNodes)
 {
+	int fdsave = open(SAVE_FILE, O_WRONLY | O_APPEND, 0666);
 	char msg[300];
 	g_tree_insert(tree, g_strdup(in->title), in);
 	g_queue_push_tail(insertionOrder, in);
-	write(fdsavewr, in, sizeof(Index));
+	write(fdsave, in, sizeof(Index));
 	numNodes++;
 	if (numNodes > maxNodes)
 	{
@@ -89,6 +93,7 @@ int indexDocument(GTree *tree, Index *in, int fdout, int fdsavewr, int maxNodes,
 		snprintf(msg, sizeof(msg), "Indexed \"%s\" Successfully\n", in->title);
 		print_client(msg, fdout);
 	}
+	close(fdsave);
 	print_debug("Indexed Successfully\n");
 	return numNodes;
 }
@@ -164,7 +169,6 @@ int checkKey(GTree *tree, char index[], int fdout)
 
 int deleteKey(GTree *tree, char index[], int fdout, int fdsave, GQueue *insertionOrder, int numNodes)
 {
-	// falta dar print ao cliente dizer qnd n encontrou para dar delete
 	// doing
 	gboolean deleted;
 	gpointer exist;
@@ -181,10 +185,7 @@ int deleteKey(GTree *tree, char index[], int fdout, int fdsave, GQueue *insertio
 	}
 	else
 	{
-		char msg[250];
-		print_debug("Index entry deleted\n"); // if the function found the key index deletes the node from the Tree
-		snprintf(msg, sizeof(msg), "Index entry %s deleted\n", index);
-		print_client(msg, fdout);
+		print_debug("Index entry deleted on cache\n"); // if the function found the key index deletes the node from the Tree
 	}
 
 	// now we need to delete it from the disk
@@ -197,22 +198,40 @@ int deleteKey(GTree *tree, char index[], int fdout, int fdsave, GQueue *insertio
 	Index temp;
 	lseek(fdsave, 0, SEEK_SET); // rewind file descriptor to beginning
 
+	int found = 0;
 	while (read(fdsave, &temp, sizeof(Index)) == sizeof(Index))
 	{
 		if (strcmp(temp.title, index) == 0)
 		{
 			// when it is found we dont have to write it
 			print_debug("The index was found on disk and deleted\n");
+			char msg[250];
+			snprintf(msg, sizeof(msg), "Index entry %s deleted\n", index);
+			print_client(msg, fdout);
+			found = 1;
 		}
 		else
 		{
 			write(fdtemp, &temp, sizeof(Index));
 		}
 	}
+	if (!found)
+	{
+		print_client("The index was not found\n", fdout);
+	}
+	close(fdsave);
 	close(fdtemp);
 
 	// after copying everything we replace it
 	rename("temp_save.bin", SAVE_FILE);
+
+	// reopen the fdsave
+	fdsave = open(SAVE_FILE, O_RDONLY); // or O_RDWR depending on usage
+	if (fdsave == -1)
+	{
+		perror("Failed to reopen SAVE_FILE after rename");
+		// still need to hadle this error
+	}
 
 	return numNodes;
 }
@@ -353,12 +372,13 @@ int foreachIndex(char *word, int numProc, int i, int fds[2])
 		idx = malloc(sizeof(Index));
 		if ((bytes_lidos = read(fdSave, idx, sizeof(Index))) > 0) // for each index is called the indexDocument to construct the tree
 		{
-			char *path = idx->path;		 // get path to the document
+			char *path = idx->path; // get path to the document
 			char *title = idx->title;
 
-			int fd = open(path, O_RDONLY);		 // file descriptor of document
-			off_t size = lseek(fd, 0, SEEK_END); // size of document
-			off_t chunk = size / numProc;		 // size of each part of the document that will be divided
+			int fd = open(path, O_RDONLY | O_CREAT); // file descriptor of document O_CREAT if the file doesnt exist
+			off_t size = lseek(fd, 0, SEEK_END);	 // size of document
+
+			off_t chunk = size / numProc; // size of each part of the document that will be divided
 
 			int start = i * chunk;												// start point of reading
 			int end = (i == numProc - 1 ? size : start + chunk + sizeof(word)); // ending point of reading
@@ -366,7 +386,6 @@ int foreachIndex(char *word, int numProc, int i, int fds[2])
 			char *line = malloc(line_size);										// buffer to save the read content
 
 			lseek(fd, start, SEEK_SET);
-
 			ssize_t n, bytes_read = 0;
 
 			while (bytes_read < line_size && (n = read(fd, line + bytes_read, line_size - bytes_read)) > 0) // reads a chunk of the document
@@ -377,8 +396,8 @@ int foreachIndex(char *word, int numProc, int i, int fds[2])
 			if (strstr(line, word)) // if the word is found, write it on pipe
 			{
 				int len = strlen(title);
-				write(fds[1],&len,sizeof(len));
-				write(fds[1],title,len);
+				write(fds[1], &len, sizeof(len));
+				write(fds[1], title, len);
 			}
 
 			print_debug(idx->title);
@@ -389,53 +408,60 @@ int foreachIndex(char *word, int numProc, int i, int fds[2])
 	return 0;
 }
 
-int searchKeyword(GTree *tree, char word[], int numProc, int fdout)
+int searchKeyword(char word[], int numProc, int fdout)
 {
 	int fds[numProc][2]; // file descriptors for pipe of each child process
 	pid_t pids[numProc];
-	
+
 	for (int i = 0; i < numProc; i++)
 	{
-		if(pipe(fds[i])<0) perror("Pipe failed");
+		if (pipe(fds[i]) < 0)
+			perror("Pipe failed");
 
-		if ((pids[i] = fork()) < 0) perror("Fork failed");
+		if ((pids[i] = fork()) < 0)
+			perror("Fork failed");
 
 		if (pids[i] == 0)
 		{
 			close(fds[i][0]);
 
-			if(foreachIndex(word, numProc, i, fds[i]) < 0){
+			if (foreachIndex(word, numProc, i, fds[i]) < 0)
+			{
 				return -1;
 			}
-			
+
 			close(fds[i][1]);
 			_exit(0);
 		}
-			
+
 		close(fds[i][1]);
 	}
-
 
 	for (int i = 0; i < numProc; i++) // wait for each child process
 	{
 		wait(NULL);
 	}
 
-	GHashTable *set = g_hash_table_new_full(g_str_hash, g_str_equal,  g_free, NULL); // hash table that acts like a set, so no duplicates
+	GHashTable *set = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, NULL); // hash table that acts like a set, so no duplicates
 
-	for(int i = 0; i < numProc; i++){
+	for (int i = 0; i < numProc; i++)
+	{
 		char buff[200];
-		
-		while(1){  // reads all titles of a given child process
-			int len; ssize_t bytes_read = read(fds[i][0],&len,sizeof(len));
-			if(bytes_read==0) break;
-			if(len >= sizeof(buff)) len = sizeof(buff)-1; // if doesn't fit buffer, it reads what bytes fit on it
- 
+
+		while (1)
+		{ // reads all titles of a given child process
+			int len;
+			ssize_t bytes_read = read(fds[i][0], &len, sizeof(len));
+			if (bytes_read == 0)
+				break;
+			if (len >= sizeof(buff))
+				len = sizeof(buff) - 1; // if doesn't fit buffer, it reads what bytes fit on it
+
 			bytes_read = read(fds[i][0], buff, len);
 
 			buff[len] = '\0';
 			char *title = g_strdup(buff);
-            g_hash_table_add(set, title);
+			g_hash_table_add(set, title);
 		}
 
 		close(fds[i][0]);
@@ -451,20 +477,24 @@ int searchKeyword(GTree *tree, char word[], int numProc, int fdout)
 
 	g_hash_table_iter_init(&iter, set);
 	print_client("[", fdout);
-	while(g_hash_table_iter_next(&iter, &key, NULL)){ // print each key in the hash table
+	while (g_hash_table_iter_next(&iter, &key, NULL))
+	{ // print each key in the hash table
 		index++;
 		char *title = (char *)key;
-	
-		if(index == total){
-			sprintf(msg,"%s", title);
-    		print_client(msg, fdout);
-		}else{
-			sprintf(msg,"%s, ", title);
-    		print_client(msg, fdout);
+
+		if (index == total)
+		{
+			sprintf(msg, "%s", title);
+			print_client(msg, fdout);
+		}
+		else
+		{
+			sprintf(msg, "%s, ", title);
+			print_client(msg, fdout);
 		}
 	}
 	print_client("]\n", fdout);
-	g_hash_table_destroy(set); 
+	g_hash_table_destroy(set);
 
 	return 0;
 }
