@@ -71,11 +71,12 @@ int main(int argc, char *argv[])
 			// if the parent didnt wait, discount it but still need to remove it... so need to fix
 			// if (pidesCount != 0)
 			// 	pidesCount--;
-			
+
 			Index *temp = malloc(sizeof(Index));
 			// seek the found one
 			off_t res = lseek(fdsave, in.offset, SEEK_SET);
-			if (res == -1) {
+			if (res == -1)
+			{
 				perror("lseek failed");
 			}
 
@@ -237,24 +238,26 @@ int main(int argc, char *argv[])
 
 				pid_t pid1 = fork();
 
-			if (pid1 == 0)
-			{
-				print_debug("-s executing\n");
-				char word[200];
-				char numProc[100];
-				strcpy(word, in.argv[0]);
-				if(in.argc == 4) strcpy(numProc, in.argv[1]);
-				else sprintf(numProc, "%d", 1); // 1 process if number not given
+				if (pid1 == 0)
+				{
+					print_debug("-s executing\n");
+					char word[200];
+					char numProc[100];
+					strcpy(word, in.argv[0]);
+					if (in.argc == 4)
+						strcpy(numProc, in.argv[1]);
+					else
+						sprintf(numProc, "%d", 1); // 1 process if number not given
 
-				searchKeyword(indexTree, word, atoi(numProc),fdout);
-				print_debug("-s finished\n");
-				_exit(1);
+					searchKeyword(indexTree, word, atoi(numProc), fdout);
+					print_debug("-s finished\n");
+					_exit(1);
+				}
+				pides[pidesCount++] = pid1;
 			}
-			pides[pidesCount++] = pid1;
-		}
-		else if (strcmp(in.flag, "-f") == 0)
-		{
-			// doing
+			else if (strcmp(in.flag, "-f") == 0)
+			{
+				// doing
 
 				if (pidesCount != 0)
 				{
@@ -276,11 +279,11 @@ int main(int argc, char *argv[])
 				print_debug("-f executing\n");
 
 				// saveMetaInfo(indexTree,fdout);   // save the meta Information on a binary file for next time use
+				g_queue_clear(insertionOrder);
 				g_tree_destroy(indexTree); // free the tree
 				close(dummy_fd);		   // kills the dummy
 			}
 
-			
 			close(fdout);
 		}
 		if (indexTree != NULL)
