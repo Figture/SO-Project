@@ -74,27 +74,47 @@ void print_index_queue(gpointer data, gpointer user_data)
 
 int indexDocument(GTree *tree, Index *in, int fdout, int maxNodes, GQueue *insertionOrder, int numNodes)
 {
-	int fdsave = open(SAVE_FILE, O_WRONLY | O_APPEND, 0666);
-	char msg[300];
-	g_tree_insert(tree, g_strdup(in->title), in);
-	g_queue_push_tail(insertionOrder, in);
-	write(fdsave, in, sizeof(Index));
-	numNodes++;
-	if (numNodes > maxNodes)
+	int fdsave = open(SAVE_FILE, O_RDWR | O_APPEND, 0666);
+	Index temp;
+	lseek(fdsave, 0, SEEK_SET); // rewind file descriptor to beginning
+	int found = 0;
+	while (read(fdsave, &temp, sizeof(Index)) == sizeof(Index) && !found)
 	{
-		Index *oldest = g_queue_pop_head(insertionOrder);
-		// free(oldest); // or reuse
-		g_tree_remove(tree, oldest->title);
-		numNodes--;
+		if (strcmp(temp.title, in->title) == 0)
+		{
+			found = 1;
+		}
 	}
+	if (found)
+	{
+		print_client("Duplicate title\n", fdout);
+		free(in);
+		close(fdsave);
+	}
+	else
+	{
+		lseek(fdsave, 0, SEEK_END); // forward  the fd to be able to write
+		g_tree_insert(tree, g_strdup(in->title), in);
+		g_queue_push_tail(insertionOrder, in);
+		write(fdsave, in, sizeof(Index));
+		numNodes++;
+		if (numNodes > maxNodes)
+		{
+			Index *oldest = g_queue_pop_head(insertionOrder);
+			// free(oldest); // or reuse
+			g_tree_remove(tree, oldest->title);
+			numNodes--;
+		}
 
-	if (fdout != 0)
-	{
-		snprintf(msg, sizeof(msg), "Indexed \"%s\" Successfully\n", in->title);
-		print_client(msg, fdout);
+		if (fdout != 0)
+		{
+			char msg[300];
+			snprintf(msg, sizeof(msg), "Indexed \"%s\" Successfully\n", in->title);
+			print_client(msg, fdout);
+		}
+		close(fdsave);
+		print_debug("Indexed Successfully\n");
 	}
-	close(fdsave);
-	print_debug("Indexed Successfully\n");
 	return numNodes;
 }
 
