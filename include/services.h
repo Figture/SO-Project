@@ -5,6 +5,7 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <glib.h>
+#include "defs.h"
 
 typedef struct index{
 	char title[200];
@@ -13,26 +14,34 @@ typedef struct index{
 	int year;
 } Index;
 
-typedef struct data_word{
-    char *word;
-} DATA_W;
-
-#define NUM_PROC 10
 #define SAVE_FILE "../saves"// Save file to save meta information presented on the tree
+#define PNUM 20
+void print_debug(const char *msg);
+
+void print_client(const char *msg, int fdout);
+
 gint compare_str(gconstpointer a, gconstpointer b, gpointer user_data);
 
 gint print_index(gpointer key, gpointer value, gpointer data);
 
-int indexDocument(GTree *tree, Index *in);
+gint print_index_debug(gpointer key, gpointer value, gpointer data);
 
-int checkKey(GTree *tree, char index[]);
+void print_index_queue(gpointer data, gpointer user_data);
 
-int deleteKey(GTree *tree, char index[]);
+int indexDocument(GTree *tree, Index *in, int fdout, int maxNodes, GQueue *insertionOrder, int numNodes);
 
-int searchKeywordByKey();
+int checkKey(GTree *tree, char index[], int fdout);
 
-int searchKeyword();
+int deleteKey(GTree *tree, char index[], int fdout, int fdsave, GQueue *insertionOrder, int numNodes);
 
-int saveMetaInfo(GTree *tree);
+int searchKeywordByKey(GTree *tree, char index[], char word[],int fdout);
 
-int buildMetaInfo(GTree *tree);
+int searchKeyword(char word[], int numProc,int fdout);
+
+int saveMetaInfo(GTree *tree,int fdout);
+
+int buildMetaInfo(GTree *tree, int fd, int maxNodes, GQueue *insertionOrder);
+
+gint findWord(gpointer key, gpointer value, gpointer data);
+
+gint saveMetaInfoNode(gpointer key, gpointer value, gpointer data);
