@@ -14,16 +14,11 @@ typedef struct index{
 	int year;
 } Index;
 
-typedef struct data_word{
-    char *word;
-	int numProc;
-	int id;
-	int fds[2];
-} DATA_W;
-
 #define SAVE_FILE "../saves"// Save file to save meta information presented on the tree
 #define PNUM 20
 void print_debug(const char *msg);
+
+void print_client(const char *msg, int fdout);
 
 gint compare_str(gconstpointer a, gconstpointer b, gpointer user_data);
 

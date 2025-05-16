@@ -6,16 +6,19 @@ int main(int argc, char *argv[])
 	int pides[PNUM];	// save the son's pids
 	int pidesCount = 0; // counter of pids
 	char documentFolder[48];
+	int maxNodes = 10;
 	if (argc > 1)
 	{
-
 		strcpy(documentFolder, argv[1]);
+		if (argc > 2)
+		{
+			maxNodes = atoi(argv[2]);
+		}
 	}
 	else
 	{
 		strcpy(documentFolder, "");
 	}
-	int maxNodes = atoi(argv[2]);
 
 	print_debug("SERVER LAUNCHED\n");
 	GTree *indexTree = g_tree_new_full(compare_str, NULL, g_free, g_free);
@@ -282,6 +285,8 @@ int main(int argc, char *argv[])
 				g_queue_clear(insertionOrder);
 				g_tree_destroy(indexTree); // free the tree
 				close(dummy_fd);		   // kills the dummy
+
+				print_client("Shutting down\n", fdout);
 			}
 
 			close(fdout);

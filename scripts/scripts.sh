@@ -46,57 +46,49 @@ sleep 1
 #                     #
 #######################
 
-INDEX_LOOKUP=1000
-cache_sizes=($(seq 1 20 101))
-
-
-rlookup_times=()
-rcache=()
-accesses=($(shuf -i 1-$INDEX_LOOKUP))
-
-echo "Random look up"
+# === CONFIGURATION ===
+INDEX_LOOKUP=1000                      # Total number of lookup requests
 output_file="../scripts/cacheTime.csv"
-echo "Cache size,Time" > "$output_file"
+cache_sizes=($(seq 0 10 100))          # Change this range to explore more
 
-for i in "${cache_sizes[@]}"; do
-    ./dserver "$PATH_DATA" "$i" &
+# === SETUP ===
+accesses=($(shuf -i 1-$INDEX_LOOKUP))  # Randomize lookup keys
+echo "Testing FIFO Cache Efficiency"
+echo "Cache Size,Total Time" > "$output_file"
 
-    # Convert the accesses array into a space-separated string
-    access_str="${accesses[*]}"
+# === MAIN LOOP ===
+for cache_size in "${cache_sizes[@]}"; do
+    echo "Starting test with cache size: $cache_size"
 
-    # Use `bash -c` to expand the loop and pass access_str
-    real_time=$( /usr/bin/time -f "%e" bash -c '
-      for j in '"$access_str"'; do
-        ./dclient -c "$j" > /dev/null
-      done
-    ' 2>&1 )
+    # Start the server
+    ./dserver "$PATH_DATA" "$cache_size" &
+    server_pid=$!
+    sleep 1  # Give the server a moment to initialize
 
-    rlookup_times+=("$real_time")
-    rcache+=($i)
+    total_time=0.0
 
-    echo "$i,$real_time" >> "$output_file"
+    # Perform all lookups
+    for idx in "${accesses[@]}"; do
+        temp_time_file=$(mktemp)
+        { /usr/bin/time -f "%e" ./dclient -c "$idx" > /dev/null; } 2> "$temp_time_file"
+        elapsed=$(<"$temp_time_file")
+        rm -f "$temp_time_file"
 
-    sleep 1
+        # Validate and sum
+        if [[ ! "$elapsed" =~ ^[0-9.]+$ ]]; then elapsed=0.0; fi
+        total_time=$(awk "BEGIN { printf \"%.3f\", $total_time + $elapsed }")
+    done
+
+    # Record result
+    echo "$cache_size,$total_time" >> "$output_file"
+    echo "Cache size $cache_size took $total_time seconds"
+
+    # Shutdown the server
     ./dclient -f
+    sleep 1
 done
+
+echo "Done. Results saved to $output_file"
 
 cd ../scripts
-
-echo "SEARCH KEYWORD TEST"
-echo "PROCS       TIME"
-echo "----------------"
-
-for i in "${!num_procs[@]}"; do
-    echo "${num_procs[$i]}       ${search_times[$i]}"
-done
-
-echo "CACHE SIZE TEST / Random"
-echo "CACHE       TIMES"
-echo "----------------"
-
-for i in "${!rcache[@]}"; do
-    echo "${rcache[$i]}       ${rlookup_times[$i]}"
-done
-
-
 
